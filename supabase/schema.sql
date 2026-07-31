@@ -30,6 +30,10 @@ create table public.client_folders (
   unique (normalized_name)
 );
 
+insert into public.client_folders (name)
+values ('Clash'), ('Juan'), ('María')
+on conflict (normalized_name) do nothing;
+
 create table public.orders (
   id uuid primary key default gen_random_uuid(),
   code text not null unique,
@@ -84,7 +88,7 @@ create or replace function public.create_order(
   requested_notes text default ''
 ) returns public.orders
 language plpgsql
-security invoker
+security definer
 set search_path = ''
 as $$
 declare
@@ -134,7 +138,7 @@ begin
     requested_client_id,
     trim(requested_client_name),
     coalesce(requested_notes, ''),
-    auth.uid()
+    null
   )
   returning * into created_order;
 
@@ -142,32 +146,50 @@ begin
 end;
 $$;
 
-create or replace function public.prepare_pending_order_image(
+create or replace function public.prepare_order_image(
   requested_client_id uuid,
+  requested_order_id uuid,
   requested_image_id uuid,
   requested_filename text,
   requested_mime_type text,
   requested_size_bytes bigint
 ) returns public.order_images
 language plpgsql
-security invoker
+security definer
 set search_path = ''
 as $$
 declare
   target_order_id uuid;
+  safe_filename text;
   prepared_image public.order_images;
 begin
-  select id into target_order_id
-  from public.orders
-  where client_id = requested_client_id
-    and status = 'pending'
-  order by created_at desc
-  limit 1
-  for update;
+  if requested_order_id is not null then
+    select id into target_order_id
+    from public.orders
+    where id = requested_order_id
+      and client_id = requested_client_id
+      and status = 'pending'
+    for update;
+  else
+    select id into target_order_id
+    from public.orders
+    where client_id = requested_client_id
+      and status = 'pending'
+    order by created_at desc
+    limit 1
+    for update;
+  end if;
 
   if target_order_id is null then
     raise exception 'NO_PENDING_ORDER';
   end if;
+
+  safe_filename := regexp_replace(
+    coalesce(nullif(trim(requested_filename), ''), 'imagen'),
+    '[^a-zA-Z0-9._-]+',
+    '-',
+    'g'
+  );
 
   insert into public.order_images (
     id,
@@ -181,11 +203,11 @@ begin
   values (
     requested_image_id,
     target_order_id,
-    'orders/' || target_order_id || '/' || requested_image_id || '/' || requested_filename,
+    'orders/' || target_order_id || '/' || requested_image_id || '/' || safe_filename,
     requested_filename,
     requested_mime_type,
     requested_size_bytes,
-    auth.uid()
+    null
   )
   returning * into prepared_image;
 
@@ -193,37 +215,103 @@ begin
 end;
 $$;
 
+create or replace function public.complete_order_image(requested_image_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  update public.order_images
+  set upload_status = 'ready'
+  where id = requested_image_id
+    and upload_status = 'pending';
+
+  if not found then
+    raise exception 'IMAGE_NOT_FOUND';
+  end if;
+end;
+$$;
+
+create or replace function public.fail_order_image(requested_image_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  update public.order_images
+  set upload_status = 'failed'
+  where id = requested_image_id
+    and upload_status = 'pending';
+end;
+$$;
+
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values (
+  'order-images',
+  'order-images',
+  false,
+  6291456,
+  array['image/jpeg', 'image/png', 'image/webp', 'image/gif']
+)
+on conflict (id) do update set
+  public = excluded.public,
+  file_size_limit = excluded.file_size_limit,
+  allowed_mime_types = excluded.allowed_mime_types;
+
 alter table public.client_folders enable row level security;
 alter table public.orders enable row level security;
 alter table public.order_images enable row level security;
 alter table public.order_status_history enable row level security;
 alter table public.order_code_sequences enable row level security;
 
-create policy "authenticated users read client folders"
-on public.client_folders for select to authenticated using (true);
+create policy "internal app reads client folders"
+on public.client_folders for select to anon, authenticated using (true);
 
-create policy "authenticated users read orders"
-on public.orders for select to authenticated using (true);
+create policy "internal app reads orders"
+on public.orders for select to anon, authenticated using (true);
 
-create policy "authenticated users update orders"
-on public.orders for update to authenticated using (true) with check (true);
+create policy "internal app updates orders"
+on public.orders for update to anon, authenticated using (true) with check (true);
 
-create policy "authenticated users read images"
-on public.order_images for select to authenticated using (true);
+create policy "internal app reads images"
+on public.order_images for select to anon, authenticated using (true);
 
-create policy "authenticated users create images for an existing order"
-on public.order_images for insert to authenticated
+create policy "internal app reads status history"
+on public.order_status_history for select to anon, authenticated using (true);
+
+create policy "internal app creates status history"
+on public.order_status_history for insert to anon, authenticated
+with check (changed_by is null);
+
+create policy "internal app reads order image objects"
+on storage.objects for select to anon, authenticated
+using (bucket_id = 'order-images');
+
+create policy "prepared order image uploads only"
+on storage.objects for insert to anon, authenticated
 with check (
-  uploaded_by = (select auth.uid())
-  and exists (select 1 from public.orders where orders.id = order_images.order_id)
+  bucket_id = 'order-images'
+  and exists (
+    select 1
+    from public.order_images
+    where order_images.storage_key = name
+      and order_images.upload_status = 'pending'
+  )
 );
 
-create policy "authenticated users read status history"
-on public.order_status_history for select to authenticated using (true);
+revoke all on function public.create_order(text, uuid, text) from public;
+revoke all on function public.prepare_order_image(uuid, uuid, uuid, text, text, bigint) from public;
+revoke all on function public.complete_order_image(uuid) from public;
+revoke all on function public.fail_order_image(uuid) from public;
 
-create policy "authenticated users create status history"
-on public.order_status_history for insert to authenticated
-with check (changed_by = (select auth.uid()));
+grant select on public.client_folders to anon, authenticated;
+grant select, update on public.orders to anon, authenticated;
+grant select on public.order_images to anon, authenticated;
+grant select, insert on public.order_status_history to anon, authenticated;
 
--- Private bucket paths must be generated server-side:
--- orders/{order_id}/{image_id}/{sanitized_filename}
+grant execute on function public.create_order(text, uuid, text) to anon, authenticated;
+grant execute on function public.prepare_order_image(uuid, uuid, uuid, text, text, bigint) to anon, authenticated;
+grant execute on function public.complete_order_image(uuid) to anon, authenticated;
+grant execute on function public.fail_order_image(uuid) to anon, authenticated;

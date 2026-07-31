@@ -13,6 +13,13 @@ import {
   type OrderImage,
   type OrderStatus,
 } from "../../lib/orders";
+import { isSupabaseConfigured } from "../../lib/supabase/client";
+import {
+  createRemoteOrder,
+  loadWorkspace,
+  updateRemoteOrderStatus,
+  uploadRemoteImages,
+} from "../../lib/supabase/orders-repository";
 import {
   ArrowIcon,
   BoxIcon,
@@ -20,7 +27,6 @@ import {
   FolderIcon,
   GridIcon,
   ImageIcon,
-  MoreIcon,
   PlusIcon,
   SearchIcon,
   UploadIcon,
@@ -90,14 +96,85 @@ const seedOrders: Order[] = [
 
 const statuses: OrderStatus[] = ["Pendiente", "En producción", "Terminado", "Entregado"];
 const statusStyles: Record<OrderStatus, string> = {
-  Pendiente: "status-pending",
-  "En producción": "status-production",
-  Terminado: "status-finished",
-  Entregado: "status-delivered",
+  Pendiente: "text-[#9a5b32] bg-[#fbede2]",
+  "En producción": "text-[#356753] bg-[#e4eee8]",
+  Terminado: "text-[#65597d] bg-[#eeeaf5]",
+  Entregado: "text-[#63706a] bg-[#edf0ee]",
 };
 
+const ui = {
+  appShell: "min-h-screen bg-[#f7f7f5] text-[#202825]",
+  sidebar: "sticky top-0 z-20 flex h-[68px] items-center border-b border-[#e7e8e5] bg-white/95 px-[clamp(18px,4vw,48px)] backdrop-blur-xl",
+  brand: "flex shrink-0 items-center gap-2.5 text-inherit no-underline",
+  brandMark: "grid size-8 place-items-center rounded-lg bg-[#235c4c] text-sm font-bold text-white",
+  brandCopy: "leading-none [&_strong]:block [&_strong]:text-sm [&_strong]:font-bold [&_strong]:tracking-[.04em] [&_span]:mt-1 [&_span]:block [&_span]:text-[9px] [&_span]:font-medium [&_span]:uppercase [&_span]:tracking-[.12em] [&_span]:text-[#89928e]",
+  nav: "fixed inset-x-0 bottom-0 z-30 flex h-[calc(64px+env(safe-area-inset-bottom))] items-start justify-center gap-2 border-t border-[#e3e5e2] bg-white/95 px-4 pt-2 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl",
+  navItem: "flex h-12 min-w-[112px] items-center justify-center gap-2 rounded-lg px-4 text-xs font-medium text-[#6f7874] no-underline transition-colors hover:bg-[#f3f5f2] hover:text-[#235c4c] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#235c4c] [&_svg]:size-4 max-[480px]:min-w-0 max-[480px]:flex-1 max-[480px]:flex-col max-[480px]:gap-1 max-[480px]:px-2 max-[480px]:text-[9px]",
+  navActive: "bg-[#edf3ef] font-semibold text-[#235c4c]",
+  sidebarFoot: "ml-auto flex items-center gap-2",
+  main: "mx-auto w-full max-w-[1120px] px-[clamp(18px,4vw,48px)] pb-[calc(92px+env(safe-area-inset-bottom))] pt-9 motion-safe:animate-[page-enter_220ms_ease-out_both] max-[600px]:pt-6",
+  topbar: "mb-8 flex items-start justify-between gap-6",
+  connectionStatus: "mt-2 flex items-center gap-2 text-[11px] text-[#7b8580] [&_i]:size-1.5 [&_i]:rounded-full",
+  eyebrow: "mb-1.5 text-[10px] font-semibold uppercase tracking-[.12em] text-[#8b9490]",
+  h1: "text-[clamp(26px,3vw,34px)] font-semibold tracking-[-.035em]",
+  h2: "text-xl font-semibold tracking-[-.025em]",
+  primaryButton: "inline-flex min-h-10 cursor-pointer items-center justify-center gap-2 rounded-lg bg-[#235c4c] px-4 text-xs font-semibold text-white transition-colors hover:bg-[#1b4d40] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#235c4c] disabled:cursor-not-allowed disabled:opacity-50 [&_svg]:size-4",
+  secondaryButton: "inline-flex min-h-10 cursor-pointer items-center justify-center gap-2 rounded-lg border border-[#dfe3df] bg-white px-3.5 text-xs font-semibold text-[#34413c] transition-colors hover:bg-[#f5f6f4] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#235c4c] disabled:cursor-not-allowed disabled:opacity-50 [&_svg]:size-4",
+  textButton: "inline-flex cursor-pointer items-center justify-center gap-1 bg-transparent text-[11px] text-[#75807b] [&_svg]:w-[14px]",
+  overview: "mb-8",
+  sectionHeading: "mb-4 flex items-end justify-between gap-5 max-[680px]:flex-col max-[680px]:items-stretch",
+  ordersHeading: "",
+  metricGrid: "grid grid-cols-4 overflow-hidden rounded-xl border border-[#e4e6e3] bg-white max-[680px]:grid-cols-2",
+  metricCard: "flex min-h-[82px] cursor-pointer flex-col justify-center border-r border-[#e7e9e6] px-5 text-left transition-colors last:border-r-0 hover:bg-[#fafbf9] max-[680px]:border-b max-[680px]:odd:border-r max-[680px]:even:border-r-0 max-[680px]:nth-[n+3]:border-b-0 [&_strong]:mt-1.5 [&_strong]:text-2xl [&_strong]:font-semibold [&_strong]:leading-none",
+  metricSelected: "bg-[#edf3ef] text-[#235c4c] hover:bg-[#edf3ef]",
+  metricLabel: "text-[11px] font-medium text-[#717b76]",
+  searchBox: "flex h-10 w-[min(340px,48%)] items-center gap-2.5 rounded-lg border border-[#dfe3df] bg-white px-3 focus-within:border-[#94aa9f] focus-within:ring-2 focus-within:ring-[#e8efeb] [&_svg]:size-4 [&_svg]:shrink-0 [&_svg]:text-[#8a938f] max-[680px]:w-full",
+  searchInput: "min-w-0 flex-1 border-0 bg-transparent text-xs text-[#202825] outline-none placeholder:text-[#9ba39f]",
+  orderList: "overflow-hidden rounded-xl border border-[#e4e6e3] bg-white",
+  tableGrid: "grid grid-cols-[minmax(220px,2fr)_minmax(130px,1fr)_90px_100px_20px] items-center gap-x-4",
+  listHead: "min-h-10 border-b border-[#e7e9e6] bg-[#fafbf9] px-4 text-[9px] font-semibold uppercase tracking-[.08em] text-[#929a96] max-[760px]:hidden",
+  orderRow: "min-h-[70px] w-full cursor-pointer border-b border-[#eceeeb] bg-white px-4 text-left transition-colors last:border-b-0 hover:bg-[#fafbf9] focus-visible:relative focus-visible:z-10 focus-visible:outline-2 focus-visible:outline-[#235c4c] max-[760px]:grid-cols-[1fr_auto] max-[760px]:grid-rows-2 max-[760px]:gap-y-2 max-[760px]:p-3.5",
+  orderIdentity: "flex min-w-0 items-center gap-3 max-[760px]:[grid-area:1/1] [&_strong]:block [&_strong]:truncate [&_strong]:text-xs [&_strong]:font-semibold [&_small]:mt-1 [&_small]:block [&_small]:truncate [&_small]:text-[10px] [&_small]:text-[#828b87]",
+  orderCover: "grid size-10 shrink-0 place-items-center rounded-lg text-white/80 [&_svg]:size-[17px]",
+  folderCover: "bg-[#dfe9e2] text-[#173d34]",
+  statusPill: "inline-flex w-max items-center gap-1.5 rounded-full px-2.5 py-1.5 text-[9px] font-semibold [&_i]:size-1.5 [&_i]:rounded-full [&_i]:bg-current",
+  statusCell: "max-[760px]:[grid-area:2/1]",
+  imageCount: "flex items-center gap-1.5 text-[10px] text-[#68726d] [&_svg]:size-3.5 max-[760px]:[grid-area:2/2] max-[760px]:justify-self-end",
+  dateCell: "text-[10px] capitalize text-[#747e79] max-[760px]:hidden",
+  rowArrow: "text-[#a4aca8] [&_svg]:size-3.5 max-[760px]:[grid-area:1/2]",
+  emptyState: "flex min-h-[190px] flex-col items-center justify-center gap-2 px-5 text-center text-[11px] text-[#78827d] [&_svg]:mb-1 [&_svg]:size-5 [&_strong]:text-xs [&_strong]:font-semibold [&_strong]:text-[#202825]",
+  modalBackdrop: "fixed inset-0 z-40 grid place-items-center bg-[rgb(22_31_28/42%)] p-5 backdrop-blur-sm max-[480px]:p-2.5",
+  modal: "max-h-[calc(100vh-40px)] w-[min(500px,100%)] overflow-auto rounded-xl bg-white p-6 shadow-[0_24px_70px_rgb(18_33_28/22%)] motion-safe:animate-[modal-in_.18s_ease-out] max-[480px]:max-h-[calc(100vh-20px)] max-[480px]:p-5",
+  modalHead: "mb-6 flex items-start justify-between gap-5 [&_h2]:text-xl [&_h2]:font-semibold [&_h2]:tracking-[-.025em]",
+  iconButton: "inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-lg text-[#66706b] transition-colors hover:bg-[#f1f3f0] focus-visible:outline-2 focus-visible:outline-[#235c4c] [&_svg]:size-4",
+  field: "mb-4 grid gap-1.5 [&>span]:text-[10px] [&>span]:font-semibold [&>span]:text-[#68726d] [&_input]:w-full [&_input]:rounded-lg [&_input]:border [&_input]:border-[#dfe3df] [&_input]:bg-white [&_input]:px-3 [&_input]:py-2.5 [&_input]:text-xs [&_input]:outline-none [&_input:focus]:border-[#8fa79c] [&_input:focus]:ring-2 [&_input:focus]:ring-[#e8efeb] [&_textarea]:w-full [&_textarea]:resize-y [&_textarea]:rounded-lg [&_textarea]:border [&_textarea]:border-[#dfe3df] [&_textarea]:bg-white [&_textarea]:px-3 [&_textarea]:py-2.5 [&_textarea]:text-xs [&_textarea]:outline-none [&_textarea:focus]:border-[#8fa79c] [&_textarea:focus]:ring-2 [&_textarea:focus]:ring-[#e8efeb] [&_select]:w-full [&_select]:rounded-lg [&_select]:border [&_select]:border-[#dfe3df] [&_select]:bg-white [&_select]:px-3 [&_select]:py-2.5 [&_select]:text-xs [&_select]:outline-none [&_select:focus]:border-[#8fa79c] [&_select:focus]:ring-2 [&_select:focus]:ring-[#e8efeb]",
+  uploadZone: "flex min-h-[145px] flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-[#bdc8c2] bg-[#fafbf9] px-5 text-center [&>svg]:size-6 [&>svg]:text-[#235c4c] [&>strong]:text-xs [&>span]:text-[10px] [&>span]:leading-relaxed [&>span]:text-[#78827d] [&_button]:mt-1",
+  fileSummary: "mt-2.5 flex max-h-20 flex-wrap gap-1.5 overflow-auto [&_span]:flex [&_span]:max-w-full [&_span]:items-center [&_span]:gap-1.5 [&_span]:overflow-hidden [&_span]:text-ellipsis [&_span]:rounded-md [&_span]:bg-[#eef2ef] [&_span]:px-2 [&_span]:py-1.5 [&_span]:text-[9px] [&_svg]:size-3 [&_svg]:shrink-0",
+  assignmentStep: "grid gap-[10px]",
+  assignmentCard: "grid w-full cursor-pointer grid-cols-[18px_1fr] items-start gap-3 rounded-lg border border-[#dfe3df] bg-white p-3.5 text-left transition-colors hover:bg-[#fafbf9] disabled:cursor-not-allowed disabled:opacity-50 [&_strong]:block [&_strong]:text-xs [&_strong]:font-semibold [&_small]:mt-1 [&_small]:block [&_small]:text-[10px] [&_small]:leading-relaxed [&_small]:text-[#75807b]",
+  assignmentSelected: "border-[#7f9d90] bg-[#f1f6f2]",
+  assignmentRadio: "size-[17px] rounded-full border-[1.5px] border-[#aab4af] shadow-[inset_0_0_0_4px_transparent]",
+  assignmentRadioSelected: "border-[#173d34] bg-[#173d34] shadow-[inset_0_0_0_4px_#f1f6f2]",
+  assignmentSelect: "mb-0 mt-1 rounded-lg bg-[#f7f8f6] p-3",
+  safetyNote: "mt-4 flex items-start gap-2.5 rounded-lg bg-[#eef5f0] p-3 text-[#335a4b] [&>span]:grid [&>span]:size-[18px] [&>span]:shrink-0 [&>span]:place-items-center [&>span]:rounded-full [&>span]:bg-[#d7e7dc] [&>span]:text-[9px] [&_p]:m-0 [&_p]:text-[10px] [&_p]:leading-relaxed [&_strong]:block [&_strong]:text-[10px] [&_strong]:font-semibold [&_strong]:text-[#25483b]",
+  modalActions: "mt-5 flex justify-end gap-2 max-[480px]:grid max-[480px]:grid-cols-2",
+  drawerBackdrop: "place-items-stretch end p-0",
+  drawer: "h-full w-[min(460px,100%)] overflow-auto bg-white p-6 pb-[calc(24px+env(safe-area-inset-bottom))] shadow-[-20px_0_60px_rgb(18_33_28/18%)] motion-safe:animate-[drawer-in_.2s_ease-out] max-[480px]:p-5 max-[480px]:pb-[calc(80px+env(safe-area-inset-bottom))]",
+  drawerContent: "grid gap-5",
+  folderSummary: "mb-5 grid grid-cols-3 divide-x divide-[#e4e7e3] rounded-lg border border-[#e4e7e3] bg-[#fafbf9] py-3 [&_span]:px-2 [&_span]:text-center [&_span]:text-[9px] [&_span]:text-[#75807b] [&_strong]:mb-1 [&_strong]:block [&_strong]:text-lg [&_strong]:font-semibold [&_strong]:leading-none [&_strong]:text-[#202825]",
+  folderOrderList: "divide-y divide-[#e7e9e6] overflow-hidden rounded-lg border border-[#e4e7e3]",
+  folderOrderCard: "grid w-full cursor-pointer grid-cols-[40px_minmax(90px,1fr)_auto_16px] items-center gap-2.5 bg-white p-3 text-left transition-colors hover:bg-[#fafbf9] [&>svg]:size-3.5 [&>svg]:text-[#9aa39f] max-[480px]:grid-cols-[40px_minmax(0,1fr)_16px] max-[480px]:[&>span:nth-child(3)]:col-start-2 max-[480px]:[&>span:nth-child(3)]:row-start-2",
+  folderOrderCopy: "min-w-0 [&_strong]:block [&_strong]:truncate [&_strong]:text-xs [&_strong]:font-semibold [&_small]:mt-1 [&_small]:block [&_small]:truncate [&_small]:text-[9px] [&_small]:text-[#75807b]",
+  detailBlock: "grid gap-2 [&>span]:text-[10px] [&>span]:font-semibold [&>span]:text-[#69736e] [&_p]:m-0 [&_p]:text-xs [&_p]:leading-relaxed [&_p]:text-[#56615c]",
+  detailTitle: "flex justify-between [&>span]:text-[10px] [&>span]:font-semibold [&>span]:text-[#69736e] [&_small]:text-[10px] [&_small]:text-[#75807b]",
+  imageGrid: "grid grid-cols-2 gap-[9px]",
+  imageTile: "flex aspect-[1.35] min-w-0 flex-col items-center justify-center gap-2 rounded-lg bg-[#eef1ee] text-[#78837e] [&_svg]:size-5 [&_small]:max-w-[85%] [&_small]:truncate [&_small]:text-[9px] [&_time]:text-[8px] [&_time]:text-[#65706b]",
+  imagePreview: "relative justify-end overflow-hidden bg-cover bg-center text-white after:absolute after:inset-x-0 after:bottom-0 after:top-[45%] after:bg-gradient-to-b after:from-transparent after:to-[rgb(14_24_21/75%)] [&_small]:relative [&_small]:z-[1] [&_small]:text-white [&_small]:[text-shadow:0_1px_2px_rgb(0_0_0/30%)] [&_time]:relative [&_time]:z-[1] [&_time]:text-white [&_time]:[text-shadow:0_1px_2px_rgb(0_0_0/30%)]",
+  drawerEmpty: "col-span-full p-7 text-center text-[11px] text-[#75807b]",
+} as const;
+
 const navigation = [
-  { label: "Resumen", href: "/", view: "resumen", icon: GridIcon },
+  { label: "Inicio", href: "/", view: "resumen", icon: GridIcon },
   { label: "Pedidos", href: "/pedidos", view: "pedidos", icon: BoxIcon },
   { label: "Carpetas", href: "/carpetas", view: "carpetas", icon: FolderIcon },
 ];
@@ -138,47 +215,77 @@ export function OrdersDashboard({ view = "resumen" }: { view?: DashboardView }) 
   const [showUpload, setShowUpload] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
-  const [hydrated, setHydrated] = useState(false);
+  const [dataSource, setDataSource] = useState<"loading" | "local" | "supabase">("loading");
 
   useEffect(() => {
+    let cancelled = false;
     const frame = window.requestAnimationFrame(() => {
-      const saved = window.localStorage.getItem("mava-orders");
-      if (saved) {
-        try {
-          type StoredOrder = Omit<Order, "clientId" | "images"> & {
-            clientId?: string;
-            images?: OrderImage[];
-            imageNames?: string[];
-          };
-          const storedOrders = JSON.parse(saved) as StoredOrder[];
-          const migratedOrders = storedOrders.map((order) => {
-            const clientId = order.clientId ?? folderIdFromName(order.clientName);
-            return {
-              ...order,
-              clientId,
-              images: order.images ?? legacyImages(order.id, order.imageNames ?? [], order.createdAt),
+      const loadLocalWorkspace = () => {
+        if (cancelled) return;
+        const saved = window.localStorage.getItem("mava-orders");
+        if (saved) {
+          try {
+            type StoredOrder = Omit<Order, "clientId" | "images"> & {
+              clientId?: string;
+              images?: OrderImage[];
+              imageNames?: string[];
             };
-          });
-          const migratedFolders = migratedOrders.reduce<ClientFolder[]>((result, order) => {
-            if (!result.some((folder) => folder.id === order.clientId)) {
-              result.push({ id: order.clientId, name: order.clientName });
-            }
-            return result;
-          }, [...seedFolders]);
-          setFolders(migratedFolders);
-          setOrders(migratedOrders);
-        } catch {
-          window.localStorage.removeItem("mava-orders");
+            const storedOrders = JSON.parse(saved) as StoredOrder[];
+            const migratedOrders = storedOrders.map((order) => {
+              const clientId = order.clientId ?? folderIdFromName(order.clientName);
+              return {
+                ...order,
+                clientId,
+                images: order.images ?? legacyImages(order.id, order.imageNames ?? [], order.createdAt),
+              };
+            });
+            const migratedFolders = migratedOrders.reduce<ClientFolder[]>((result, order) => {
+              if (!result.some((folder) => folder.id === order.clientId)) {
+                result.push({ id: order.clientId, name: order.clientName });
+              }
+              return result;
+            }, [...seedFolders]);
+            setFolders(migratedFolders);
+            setOrders(migratedOrders);
+          } catch {
+            window.localStorage.removeItem("mava-orders");
+          }
         }
+        setDataSource("local");
+      };
+
+      if (!isSupabaseConfigured()) {
+        loadLocalWorkspace();
+        return;
       }
-      setHydrated(true);
+
+      void loadWorkspace()
+        .then((workspace) => {
+          if (cancelled) return;
+          setFolders(workspace.folders);
+          setOrders(workspace.orders);
+          setDataSource("supabase");
+        })
+        .catch(() => {
+          if (cancelled) return;
+          sileo.error({
+            title: "No se pudo conectar con Supabase",
+            description: "Se abrió el modo local para que puedas seguir trabajando.",
+          });
+          loadLocalWorkspace();
+        });
     });
-    return () => window.cancelAnimationFrame(frame);
+    return () => {
+      cancelled = true;
+      window.cancelAnimationFrame(frame);
+    };
   }, []);
 
   useEffect(() => {
-    if (hydrated) window.localStorage.setItem("mava-orders", JSON.stringify(orders));
-  }, [orders, hydrated]);
+    if (dataSource === "local") {
+      window.localStorage.setItem("mava-orders", JSON.stringify(orders));
+    }
+  }, [orders, dataSource]);
 
   const filteredOrders = useMemo(() => {
     const normalized = query.trim().toLocaleLowerCase("es");
@@ -214,37 +321,71 @@ export function OrdersDashboard({ view = "resumen" }: { view?: DashboardView }) 
     [orders],
   );
 
-  function createOrder(input: { clientId: string; notes: string; files: File[] }) {
+  async function createOrder(input: { clientId: string; notes: string; files: File[] }) {
+    if (dataSource === "loading") return false;
     const folder = folders.find((candidate) => candidate.id === input.clientId);
-    if (!folder) return;
-    const id = crypto.randomUUID();
-    const order: Order = {
-      id,
-      code: getNextCode(orders),
-      clientId: folder.id,
-      clientName: folder.name,
-      status: "Pendiente",
-      notes: input.notes,
-      createdAt: new Date().toISOString(),
-      images: input.files.map((file) => ({
-        id: crypto.randomUUID(),
-        pedidoId: id,
-        name: file.name,
-        addedAt: new Date().toISOString(),
-      })),
-      cover: "linear-gradient(145deg, #dccab0, #8d7255)",
-    };
-    setOrders((current) => [order, ...current]);
-    setShowCreate(false);
-    setSelectedOrder(order);
+    if (!folder) return false;
+
+    try {
+      let order: Order;
+      if (dataSource === "supabase") {
+        order = await createRemoteOrder(folder.id, input.notes);
+        if (input.files.length) {
+          const upload = await uploadRemoteImages({
+            clientId: folder.id,
+            orderId: order.id,
+            files: input.files,
+          });
+          order = { ...order, images: upload.images };
+        }
+      } else {
+        const id = crypto.randomUUID();
+        order = {
+          id,
+          code: getNextCode(orders),
+          clientId: folder.id,
+          clientName: folder.name,
+          status: "Pendiente",
+          notes: input.notes,
+          createdAt: new Date().toISOString(),
+          images: await Promise.all(input.files.map((file) => fileToOrderImage(file, id))),
+          cover: "linear-gradient(145deg, #dccab0, #8d7255)",
+        };
+      }
+      setOrders((current) => [order, ...current]);
+      setSelectedOrder(order);
+      return true;
+    } catch {
+      sileo.error({
+        title: "Error al crear el pedido",
+        description: `No se pudo crear el pedido de ${folder.name}. Intenta nuevamente.`,
+      });
+      return false;
+    }
   }
 
-  function updateStatus(id: string, status: OrderStatus) {
+  async function updateStatus(id: string, status: OrderStatus) {
+    const previousStatus = orders.find((order) => order.id === id)?.status;
     setOrders((current) => current.map((order) => (order.id === id ? { ...order, status } : order)));
     setSelectedOrder((current) => (current?.id === id ? { ...current, status } : current));
+
+    if (dataSource !== "supabase") return;
+    try {
+      await updateRemoteOrderStatus(id, status);
+    } catch {
+      if (previousStatus) {
+        setOrders((current) => current.map((order) => order.id === id ? { ...order, status: previousStatus } : order));
+        setSelectedOrder((current) => current?.id === id ? { ...current, status: previousStatus } : current);
+      }
+      sileo.error({
+        title: "No se pudo cambiar el estado",
+        description: "El pedido volvió a su estado anterior.",
+      });
+    }
   }
 
   async function uploadImagesToFolder(clientId: string, files: File[], requestedOrderId?: string) {
+    if (dataSource === "loading") return false;
     const folder = folders.find((candidate) => candidate.id === clientId);
     if (!folder) {
       sileo.error({
@@ -270,9 +411,9 @@ export function OrdersDashboard({ view = "resumen" }: { view?: DashboardView }) 
     }
 
     try {
-      const uploadedImages = await Promise.all(
-        files.map((file) => fileToOrderImage(file, targetOrder.id)),
-      );
+      const uploadedImages = dataSource === "supabase"
+        ? (await uploadRemoteImages({ clientId, orderId: targetOrder.id, files })).images
+        : await Promise.all(files.map((file) => fileToOrderImage(file, targetOrder.id)));
       const updatedOrder = {
         ...targetOrder,
         images: [...uploadedImages, ...targetOrder.images],
@@ -281,9 +422,6 @@ export function OrdersDashboard({ view = "resumen" }: { view?: DashboardView }) 
         order.id === targetOrder.id ? updatedOrder : order
       ));
 
-      if (hydrated) {
-        window.localStorage.setItem("mava-orders", JSON.stringify(updatedOrders));
-      }
       setOrders(updatedOrders);
       setSelectedOrder((current) => (
         current?.clientId === clientId ? updatedOrder : current
@@ -305,27 +443,31 @@ export function OrdersDashboard({ view = "resumen" }: { view?: DashboardView }) 
   }
 
   async function createPendingOrderWithImages(clientId: string, files: File[]) {
+    if (dataSource === "loading") return false;
     const folder = folders.find((candidate) => candidate.id === clientId);
     if (!folder) return false;
 
     try {
-      const id = crypto.randomUUID();
-      const images = await Promise.all(files.map((file) => fileToOrderImage(file, id)));
-      const order: Order = {
-        id,
-        code: getNextCode(orders),
-        clientId: folder.id,
-        clientName: folder.name,
-        status: "Pendiente",
-        notes: "",
-        createdAt: new Date().toISOString(),
-        images,
-        cover: "linear-gradient(145deg, #dccab0, #8d7255)",
-      };
-      const updatedOrders = [order, ...orders];
-      if (hydrated) {
-        window.localStorage.setItem("mava-orders", JSON.stringify(updatedOrders));
+      let order: Order;
+      if (dataSource === "supabase") {
+        order = await createRemoteOrder(folder.id, "");
+        const upload = await uploadRemoteImages({ clientId: folder.id, orderId: order.id, files });
+        order = { ...order, images: upload.images };
+      } else {
+        const id = crypto.randomUUID();
+        order = {
+          id,
+          code: getNextCode(orders),
+          clientId: folder.id,
+          clientName: folder.name,
+          status: "Pendiente",
+          notes: "",
+          createdAt: new Date().toISOString(),
+          images: await Promise.all(files.map((file) => fileToOrderImage(file, id))),
+          cover: "linear-gradient(145deg, #dccab0, #8d7255)",
+        };
       }
+      const updatedOrders = [order, ...orders];
       setOrders(updatedOrders);
       setSelectedOrder(order);
       sileo.success({
@@ -343,119 +485,140 @@ export function OrdersDashboard({ view = "resumen" }: { view?: DashboardView }) 
   }
 
   return (
-    <div className="app-shell">
+    <div className={ui.appShell}>
       <Toaster position="top-right" />
-      <aside className="sidebar">
-        <div className="brand">
-          <div className="brand-mark">M</div>
-          <div><strong>MAVA</strong><span>Pedidos</span></div>
+      <header className={ui.sidebar}>
+        <Link className={ui.brand} href="/" aria-label="Ir al inicio">
+          <div className={ui.brandMark}>M</div>
+          <div className={ui.brandCopy}><strong>MAVA</strong><span>Pedidos</span></div>
+        </Link>
+        <div className={ui.sidebarFoot}>
+          <button className={ui.secondaryButton} disabled={dataSource === "loading"} onClick={() => setShowUpload(true)}>
+            <UploadIcon /><span className="max-[560px]:sr-only">Subir imágenes</span>
+          </button>
+          <button className={ui.primaryButton} disabled={dataSource === "loading"} onClick={() => setShowCreate(true)}>
+            <PlusIcon /><span className="max-[440px]:sr-only">Nuevo pedido</span>
+          </button>
         </div>
-        <nav aria-label="Navegación principal">
-          {navigation.map(({ label, href, view: itemView, icon: Icon }) => (
-            <Link className={`nav-item ${view === itemView ? "active" : ""}`} href={href} key={label}>
-              <Icon /><span>{label}</span>
-            </Link>
-          ))}
-        </nav>
-        <div className="sidebar-foot">
-          <div className="avatar">MU</div>
-          <div><strong>Mi taller</strong><span>Administrador</span></div>
-          <MoreIcon />
-        </div>
-      </aside>
+      </header>
+      <nav className={ui.nav} aria-label="Navegación principal">
+        {navigation.map(({ label, href, view: itemView, icon: Icon }) => (
+          <Link aria-current={view === itemView ? "page" : undefined} className={`${ui.navItem} ${view === itemView ? ui.navActive : ""}`} href={href} key={label}>
+            <Icon /><span>{label}</span>
+          </Link>
+        ))}
+      </nav>
 
-      <main className="main-content">
-        <header className="topbar">
+      <main className={ui.main}>
+        <header className={ui.topbar}>
           <div>
-            <p className="eyebrow">Lunes, 27 de julio</p>
-            <h1>Buen día <span>👋</span></h1>
-          </div>
-          <div className="topbar-actions">
-            <button className="secondary-button upload-button" onClick={() => setShowUpload(true)}>
-              <UploadIcon /> Subir imágenes
-            </button>
-            <button className="primary-button" onClick={() => setShowCreate(true)}>
-              <PlusIcon /> Nuevo pedido
-            </button>
+            <p className={ui.eyebrow}>
+              {view === "pedidos" ? "Gestión" : view === "carpetas" ? "Organización" : "Mi taller"}
+            </p>
+            <h1 className={ui.h1}>
+              {view === "pedidos" ? "Pedidos" : view === "carpetas" ? "Carpetas" : "Resumen"}
+            </h1>
+            <p className={ui.connectionStatus}>
+              <i className={
+                dataSource === "supabase"
+                  ? "bg-[#3f8a69]"
+                  : dataSource === "local"
+                    ? "bg-[#c58a52]"
+                    : "animate-pulse bg-[#9aa39f]"
+              } />
+              {dataSource === "supabase"
+                ? "Supabase conectado"
+                : dataSource === "local"
+                  ? "Datos guardados en este dispositivo"
+                  : "Conectando datos..."}
+            </p>
           </div>
         </header>
 
-        {view === "resumen" && <section className="overview" aria-labelledby="overview-title">
-          <div className="section-heading">
-            <div><p className="eyebrow">Vista general</p><h2 id="overview-title">Pedidos en marcha</h2></div>
-            <button className="text-button" onClick={() => setActiveStatus("Todos")}>Ver todos <ArrowIcon /></button>
-          </div>
-          <div className="metric-grid">
-            {statuses.map((status, index) => (
+        {view === "resumen" && <section className={ui.overview} aria-labelledby="overview-title">
+          <h2 className="sr-only" id="overview-title">Pedidos por estado</h2>
+          <div className={ui.metricGrid}>
+            {statuses.map((status) => (
               <button
-                className={`metric-card metric-${index + 1} ${activeStatus === status ? "selected" : ""}`}
+                className={`${ui.metricCard} ${activeStatus === status ? ui.metricSelected : ""}`}
                 key={status}
                 onClick={() => setActiveStatus(activeStatus === status ? "Todos" : status)}
+                aria-pressed={activeStatus === status}
               >
-                <span className="metric-label">{status}</span>
-                <strong>{counts[status]}</strong>
-                <span className="metric-caption">{index === 0 ? "En el taller ahora" : index === 1 ? "Listos para entregar" : "Pedidos completados"}</span>
-                <span className="metric-arrow"><ArrowIcon /></span>
+                <span className={ui.metricLabel}>{status}</span>
+                <strong>{dataSource === "loading" ? "—" : counts[status]}</strong>
               </button>
             ))}
           </div>
         </section>}
 
-        <section className="orders-section" aria-labelledby="orders-title">
-          <div className="section-heading orders-heading">
+        <section aria-labelledby="orders-title">
+          <div className={`${ui.sectionHeading} ${ui.ordersHeading}`}>
             <div>
-              <p className="eyebrow">{view === "pedidos" ? "Gestión" : "Organización"}</p>
-              <h2 id="orders-title">{view === "pedidos" ? "Todos los pedidos" : "Carpetas de pedidos"}</h2>
+              <h2 className={ui.h2} id="orders-title">{view === "pedidos" ? "Todos los pedidos" : "Carpetas"}</h2>
+              <p className="mt-1 text-[11px] text-[#7b8580]">
+                {view === "pedidos" ? `${filteredOrders.length} pedidos encontrados` : "Pedidos agrupados por cliente"}
+              </p>
             </div>
-            <label className="search-box">
-              <SearchIcon />
-              <span className="sr-only">Buscar pedidos</span>
-              <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Buscar cliente o código..." />
-              <kbd>⌘ K</kbd>
-            </label>
+            <div className="flex items-center justify-end gap-3 max-[680px]:w-full">
+              {activeStatus !== "Todos" && (
+                <button className={ui.textButton} onClick={() => setActiveStatus("Todos")}>
+                  Quitar filtro
+                </button>
+              )}
+              <label className={ui.searchBox}>
+                <SearchIcon />
+                <span className="sr-only">Buscar pedidos</span>
+                <input className={ui.searchInput} value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Buscar carpeta o código" />
+              </label>
+            </div>
           </div>
 
-          <div className="order-list">
-            {view === "pedidos" ? (
+          <div className={ui.orderList}>
+            {dataSource === "loading" ? (
+              <div className={ui.emptyState}>
+                <BoxIcon />
+                <strong>Cargando pedidos</strong>
+                <span>Estamos preparando tu espacio de trabajo.</span>
+              </div>
+            ) : view === "pedidos" ? (
               <>
-                <div className="list-head"><span>Pedido</span><span>Estado</span><span>Imágenes</span><span>Creado</span><span /></div>
+                <div className={`${ui.tableGrid} ${ui.listHead}`}><span>Pedido</span><span>Estado</span><span>Imágenes</span><span>Creado</span><span /></div>
                 {filteredOrders.map((order) => (
-                  <button className="order-row" key={order.id} onClick={() => setSelectedOrder(order)}>
-                    <span className="order-identity">
-                      <span className="order-cover" style={{ background: order.cover }}><ImageIcon /></span>
-                      <span><strong>{order.code}</strong><small>Carpeta {order.clientName}</small></span>
+                  <button className={`${ui.tableGrid} ${ui.orderRow}`} key={order.id} onClick={() => setSelectedOrder(order)}>
+                    <span className={ui.orderIdentity}>
+                      <span className={ui.orderCover} style={{ background: order.cover }}><ImageIcon /></span>
+                      <span><strong>{order.code}</strong><small>Carpeta {order.clientName} · {formatDate(order.createdAt)}</small></span>
                     </span>
-                    <span><span className={`status-pill ${statusStyles[order.status]}`}><i />{order.status}</span></span>
-                    <span className="image-count"><ImageIcon /> {order.images.length}</span>
-                    <span className="date-cell">{formatDate(order.createdAt)}</span>
-                    <span className="row-arrow"><ArrowIcon /></span>
+                    <span className={ui.statusCell}><span className={`${ui.statusPill} ${statusStyles[order.status]}`}><i />{order.status}</span></span>
+                    <span className={ui.imageCount}><ImageIcon /> {order.images.length}</span>
+                    <span className={ui.dateCell}>{formatDate(order.createdAt)}</span>
+                    <span className={ui.rowArrow}><ArrowIcon /></span>
                   </button>
                 ))}
-                {!filteredOrders.length && <div className="empty-state"><SearchIcon /><strong>No encontramos pedidos</strong><span>Probá con otro código, carpeta o estado.</span></div>}
+                {!filteredOrders.length && <div className={ui.emptyState}><SearchIcon /><strong>No encontramos pedidos</strong><span>Probá con otro código, carpeta o estado.</span></div>}
               </>
             ) : (
               <>
-                <div className="list-head"><span>Carpeta</span><span>Pedidos</span><span>Imágenes</span><span>Actividad</span><span /></div>
+                <div className={`${ui.tableGrid} ${ui.listHead}`}><span>Carpeta</span><span>Estado</span><span>Imágenes</span><span>Actividad</span><span /></div>
                 {folderSummaries.map((folder) => (
-                  <button className="order-row" key={folder.id} onClick={() => setSelectedFolderId(folder.id)}>
-                    <span className="order-identity">
-                      <span className="order-cover folder-cover"><BoxIcon /></span>
+                  <button className={`${ui.tableGrid} ${ui.orderRow}`} key={folder.id} onClick={() => setSelectedFolderId(folder.id)}>
+                    <span className={ui.orderIdentity}>
+                      <span className={`${ui.orderCover} ${ui.folderCover}`}><FolderIcon /></span>
                       <span><strong>{folder.name}</strong><small>{folder.orderCount} pedido{folder.orderCount === 1 ? "" : "s"} en la carpeta</small></span>
                     </span>
-                    <span><span className={`status-pill ${folder.pendingCount ? "status-pending" : "status-delivered"}`}><i />{folder.pendingCount ? `${folder.pendingCount} pendiente${folder.pendingCount === 1 ? "" : "s"}` : "Sin pendientes"}</span></span>
-                    <span className="image-count"><ImageIcon /> {folder.imageCount}</span>
-                    <span className="date-cell">{folder.latestAt ? formatDate(folder.latestAt) : "Sin actividad"}</span>
-                    <span className="row-arrow"><ArrowIcon /></span>
+                    <span className={ui.statusCell}><span className={`${ui.statusPill} ${folder.pendingCount ? statusStyles.Pendiente : statusStyles.Entregado}`}><i />{folder.pendingCount ? `${folder.pendingCount} pendiente${folder.pendingCount === 1 ? "" : "s"}` : "Sin pendientes"}</span></span>
+                    <span className={ui.imageCount}><ImageIcon /> {folder.imageCount}</span>
+                    <span className={ui.dateCell}>{folder.latestAt ? formatDate(folder.latestAt) : "Sin actividad"}</span>
+                    <span className={ui.rowArrow}><ArrowIcon /></span>
                   </button>
                 ))}
-                {!folderSummaries.length && <div className="empty-state"><SearchIcon /><strong>No encontramos carpetas</strong><span>Probá con otro nombre, código o estado.</span></div>}
+                {!folderSummaries.length && <div className={ui.emptyState}><SearchIcon /><strong>No encontramos carpetas</strong><span>Probá con otro nombre, código o estado.</span></div>}
               </>
             )}
           </div>
         </section>
       </main>
-
-      <button className="mobile-add" aria-label="Crear pedido" onClick={() => setShowCreate(true)}><PlusIcon /></button>
 
       {showCreate && (
         <CreateOrderModal
@@ -480,7 +643,7 @@ export function OrdersDashboard({ view = "resumen" }: { view?: DashboardView }) 
           order={selectedOrder}
           onClose={() => setSelectedOrder(null)}
           onStatusChange={(status) => updateStatus(selectedOrder.id, status)}
-          onAddImages={(files) => uploadImagesToFolder(selectedOrder.clientId, files)}
+          onAddImages={(files) => uploadImagesToFolder(selectedOrder.clientId, files, selectedOrder.id)}
         />
       )}
       {selectedFolderId && !selectedOrder && (
@@ -505,7 +668,7 @@ function CreateOrderModal({
   folders: ClientFolder[];
   orders: Order[];
   onClose: () => void;
-  onCreate: (input: { clientId: string; notes: string; files: File[] }) => void;
+  onCreate: (input: { clientId: string; notes: string; files: File[] }) => Promise<boolean>;
   onAssignExisting: (clientId: string, files: File[], orderId?: string) => Promise<boolean>;
 }) {
   const [clientId, setClientId] = useState(folders[0]?.id ?? "");
@@ -538,7 +701,10 @@ function CreateOrderModal({
     }
 
     if (assignment === "new") {
-      onCreate({ clientId, notes: notes.trim(), files });
+      setSaving(true);
+      const success = await onCreate({ clientId, notes: notes.trim(), files });
+      setSaving(false);
+      if (success) onClose();
       return;
     }
 
@@ -550,50 +716,50 @@ function CreateOrderModal({
   }
 
   return (
-    <div className="modal-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
-      <div className="modal" role="dialog" aria-modal="true" aria-labelledby="new-order-title">
-        <div className="modal-head">
-          <div><p className="eyebrow">Nuevo pedido · Paso {step} de 2</p><h2 id="new-order-title">{step === 1 ? `Crear ${nextCode}` : "Asignar imágenes"}</h2></div>
-          <button className="icon-button" onClick={onClose} aria-label="Cerrar"><CloseIcon /></button>
+    <div className={ui.modalBackdrop} role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
+      <div className={ui.modal} role="dialog" aria-modal="true" aria-labelledby="new-order-title">
+        <div className={ui.modalHead}>
+          <div><p className={ui.eyebrow}>Nuevo pedido · Paso {step} de 2</p><h2 id="new-order-title">{step === 1 ? `Crear ${nextCode}` : "Asignar imágenes"}</h2></div>
+          <button className={ui.iconButton} onClick={onClose} aria-label="Cerrar"><CloseIcon /></button>
         </div>
         <form onSubmit={submit}>
           {step === 1 ? (
             <>
-              <label className="field"><span>Cliente / carpeta</span><select autoFocus required value={clientId} onChange={(event) => setClientId(event.target.value)}>{folders.map((folder) => <option value={folder.id} key={folder.id}>{folder.name}</option>)}</select></label>
-              <label className="field"><span>Notas</span><textarea value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Medidas, marco, fecha de entrega..." rows={3} /></label>
-              <div className="upload-zone">
+              <label className={ui.field}><span>Cliente / carpeta</span><select autoFocus required value={clientId} onChange={(event) => setClientId(event.target.value)}>{folders.map((folder) => <option value={folder.id} key={folder.id}>{folder.name}</option>)}</select></label>
+              <label className={ui.field}><span>Notas</span><textarea value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Medidas, marco, fecha de entrega..." rows={3} /></label>
+              <div className={ui.uploadZone}>
                 <input ref={fileInput} type="file" accept="image/*" multiple hidden onChange={(event) => setFiles(Array.from(event.target.files ?? []))} />
                 <UploadIcon />
                 <strong>{files.length ? `${files.length} imagen${files.length === 1 ? "" : "es"} seleccionada${files.length === 1 ? "" : "s"}` : "Agregar imágenes"}</strong>
                 <span>En el próximo paso vas a confirmar a qué pedido asignarlas.</span>
-                <button type="button" className="secondary-button" onClick={() => fileInput.current?.click()}>Seleccionar archivos</button>
+                <button type="button" className={ui.secondaryButton} onClick={() => fileInput.current?.click()}>Seleccionar archivos</button>
               </div>
-              {files.length > 0 && <div className="file-summary">{files.map((file) => <span key={`${file.name}-${file.size}`}><ImageIcon />{file.name}</span>)}</div>}
+              {files.length > 0 && <div className={ui.fileSummary}>{files.map((file) => <span key={`${file.name}-${file.size}`}><ImageIcon />{file.name}</span>)}</div>}
             </>
           ) : (
-            <div className="assignment-step">
-              <button type="button" className={`assignment-card ${assignment === "new" ? "selected" : ""}`} onClick={() => setAssignment("new")}>
-                <span className="assignment-radio" />
+            <div className={ui.assignmentStep}>
+              <button type="button" className={`${ui.assignmentCard} ${assignment === "new" ? ui.assignmentSelected : ""}`} onClick={() => setAssignment("new")}>
+                <span className={`${ui.assignmentRadio} ${assignment === "new" ? ui.assignmentRadioSelected : ""}`} />
                 <span><strong>Asignar a pedido nuevo</strong><small>Crear {nextCode} y vincularle las imágenes seleccionadas.</small></span>
               </button>
-              <button type="button" disabled={!recommendedOrder || !files.length} className={`assignment-card ${assignment === "existing" ? "selected" : ""}`} onClick={() => recommendedOrder && files.length && setAssignment("existing")}>
-                <span className="assignment-radio" />
-                <span><strong>Asignar a un pedido</strong><small>{!files.length ? "Primero seleccioná al menos una imagen." : recommendedOrder ? `Pedido recomendado: ${recommendedOrder.code}, por ser el más reciente.` : "No hay pedidos pendientes disponibles."}</small></span>
+              <button type="button" disabled={!recommendedOrder || !files.length} className={`${ui.assignmentCard} ${assignment === "existing" ? ui.assignmentSelected : ""}`} onClick={() => recommendedOrder && files.length && setAssignment("existing")}>
+                <span className={`${ui.assignmentRadio} ${assignment === "existing" ? ui.assignmentRadioSelected : ""}`} />
+                <span><strong>Asignar a un pedido</strong><small>{!files.length ? "Primero seleccioná al menos una imagen." : recommendedOrder ? `Último pedido pendiente: ${recommendedOrder.code}.` : "No hay pedidos pendientes disponibles."}</small></span>
               </button>
               {assignment === "existing" && pendingOrders.length > 0 && (
-                <label className="field assignment-select">
+                <label className={`${ui.field} ${ui.assignmentSelect}`}>
                   <span>Pedido pendiente</span>
                   <select value={effectiveOrderId} onChange={(event) => setSelectedOrderId(event.target.value)}>
-                    {pendingOrders.map((order, index) => <option value={order.id} key={order.id}>{order.code}{index === 0 ? " — Recomendado (último pedido)" : ""}</option>)}
+                    {pendingOrders.map((order, index) => <option value={order.id} key={order.id}>{order.code}{index === 0 ? " — Último pedido" : ""}</option>)}
                   </select>
                 </label>
               )}
-              <div className="safety-note"><span>✓</span><p><strong>Confirmación manual</strong>No se creará ni modificará ningún pedido hasta que confirmes esta selección.</p></div>
+              <div className={ui.safetyNote}><span>✓</span><p><strong>Confirmación manual</strong>No se creará ni modificará ningún pedido hasta que confirmes esta selección.</p></div>
             </div>
           )}
-          <div className="modal-actions">
-            <button type="button" className="secondary-button" onClick={() => step === 2 ? setStep(1) : onClose()}>{step === 2 ? "Atrás" : "Cancelar"}</button>
-            <button className="primary-button" disabled={saving || (step === 2 && assignment === "existing" && (!files.length || !effectiveOrderId))} type="submit">{saving ? "Guardando..." : step === 1 ? "Continuar" : assignment === "new" ? "Crear pedido" : "Asignar imágenes"}</button>
+          <div className={ui.modalActions}>
+            <button type="button" className={ui.secondaryButton} onClick={() => step === 2 ? setStep(1) : onClose()}>{step === 2 ? "Atrás" : "Cancelar"}</button>
+            <button className={ui.primaryButton} disabled={saving || (step === 2 && assignment === "existing" && (!files.length || !effectiveOrderId))} type="submit">{saving ? "Guardando..." : step === 1 ? "Continuar" : assignment === "new" ? "Crear pedido" : "Asignar imágenes"}</button>
           </div>
         </form>
       </div>
@@ -650,59 +816,59 @@ function UploadToFolderModal({
   }
 
   return (
-    <div className="modal-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
-      <div className="modal" role="dialog" aria-modal="true" aria-labelledby="upload-folder-title">
-        <div className="modal-head">
-          <div><p className="eyebrow">Paso {step} de 2</p><h2 id="upload-folder-title">{step === 1 ? "Subir imágenes" : "¿A qué pedido las asignamos?"}</h2></div>
-          <button className="icon-button" onClick={onClose} aria-label="Cerrar"><CloseIcon /></button>
+    <div className={ui.modalBackdrop} role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
+      <div className={ui.modal} role="dialog" aria-modal="true" aria-labelledby="upload-folder-title">
+        <div className={ui.modalHead}>
+          <div><p className={ui.eyebrow}>Paso {step} de 2</p><h2 id="upload-folder-title">{step === 1 ? "Subir imágenes" : "¿A qué pedido las asignamos?"}</h2></div>
+          <button className={ui.iconButton} onClick={onClose} aria-label="Cerrar"><CloseIcon /></button>
         </div>
         <form onSubmit={submit}>
           {step === 1 ? (
             <>
-              <label className="field">
+              <label className={ui.field}>
                 <span>Cliente / carpeta</span>
                 <select value={clientId} onChange={(event) => setClientId(event.target.value)}>
                   {folders.map((folder) => <option value={folder.id} key={folder.id}>{folder.name}</option>)}
                 </select>
               </label>
-              <div className="upload-zone">
+              <div className={ui.uploadZone}>
                 <input ref={fileInput} type="file" accept="image/*" multiple hidden onChange={(event) => setFiles(Array.from(event.target.files ?? []))} />
                 <UploadIcon />
                 <strong>{files.length ? `${files.length} imagen${files.length === 1 ? "" : "es"} lista${files.length === 1 ? "" : "s"}` : "Seleccioná las imágenes"}</strong>
                 <span>En el próximo paso vas a elegir el pedido de destino.</span>
-                <button type="button" className="secondary-button" onClick={() => fileInput.current?.click()}>Seleccionar archivos</button>
+                <button type="button" className={ui.secondaryButton} onClick={() => fileInput.current?.click()}>Seleccionar archivos</button>
               </div>
-              {files.length > 0 && <div className="file-summary">{files.map((file) => <span key={`${file.name}-${file.size}`}><ImageIcon />{file.name}</span>)}</div>}
+              {files.length > 0 && <div className={ui.fileSummary}>{files.map((file) => <span key={`${file.name}-${file.size}`}><ImageIcon />{file.name}</span>)}</div>}
             </>
           ) : (
-            <div className="assignment-step">
-              <button type="button" className={`assignment-card ${assignment === "new" ? "selected" : ""}`} onClick={() => setAssignment("new")}>
-                <span className="assignment-radio" />
+            <div className={ui.assignmentStep}>
+              <button type="button" className={`${ui.assignmentCard} ${assignment === "new" ? ui.assignmentSelected : ""}`} onClick={() => setAssignment("new")}>
+                <span className={`${ui.assignmentRadio} ${assignment === "new" ? ui.assignmentRadioSelected : ""}`} />
                 <span><strong>Asignar a pedido nuevo</strong><small>Se creará un pedido pendiente para {folders.find((folder) => folder.id === clientId)?.name}.</small></span>
               </button>
-              <button type="button" disabled={!recommendedOrder} className={`assignment-card ${assignment === "existing" ? "selected" : ""}`} onClick={() => recommendedOrder && setAssignment("existing")}>
-                <span className="assignment-radio" />
+              <button type="button" disabled={!recommendedOrder} className={`${ui.assignmentCard} ${assignment === "existing" ? ui.assignmentSelected : ""}`} onClick={() => recommendedOrder && setAssignment("existing")}>
+                <span className={`${ui.assignmentRadio} ${assignment === "existing" ? ui.assignmentRadioSelected : ""}`} />
                 <span>
                   <strong>Asignar a un pedido</strong>
-                  <small>{recommendedOrder ? `Pedido recomendado: ${recommendedOrder.code}, por ser el más reciente.` : "No hay pedidos pendientes disponibles."}</small>
+                  <small>{recommendedOrder ? `Último pedido pendiente: ${recommendedOrder.code}.` : "No hay pedidos pendientes disponibles."}</small>
                 </span>
               </button>
               {assignment === "existing" && pendingOrders.length > 0 && (
-                <label className="field assignment-select">
+                <label className={`${ui.field} ${ui.assignmentSelect}`}>
                   <span>Pedido pendiente</span>
                   <select value={effectiveOrderId} onChange={(event) => setSelectedOrderId(event.target.value)}>
                     {pendingOrders.map((order, index) => (
-                      <option value={order.id} key={order.id}>{order.code}{index === 0 ? " — Recomendado (último pedido)" : ""}</option>
+                      <option value={order.id} key={order.id}>{order.code}{index === 0 ? " — Último pedido" : ""}</option>
                     ))}
                   </select>
                 </label>
               )}
-              <div className="safety-note"><span>✓</span><p><strong>Destino confirmado</strong>Las {files.length} imágenes quedarán vinculadas por ID y no se mezclarán con otros pedidos.</p></div>
+              <div className={ui.safetyNote}><span>✓</span><p><strong>Destino confirmado</strong>Las {files.length} imágenes quedarán vinculadas por ID y no se mezclarán con otros pedidos.</p></div>
             </div>
           )}
-          <div className="modal-actions">
-            <button type="button" className="secondary-button" onClick={() => step === 2 ? setStep(1) : onClose()}>{step === 2 ? "Atrás" : "Cancelar"}</button>
-            <button className="primary-button" disabled={!files.length || uploading || (step === 2 && assignment === "existing" && !effectiveOrderId)} type="submit">
+          <div className={ui.modalActions}>
+            <button type="button" className={ui.secondaryButton} onClick={() => step === 2 ? setStep(1) : onClose()}>{step === 2 ? "Atrás" : "Cancelar"}</button>
+            <button className={ui.primaryButton} disabled={!files.length || uploading || (step === 2 && assignment === "existing" && !effectiveOrderId)} type="submit">
               {uploading ? "Guardando..." : step === 1 ? "Continuar" : assignment === "new" ? "Crear y asignar" : "Asignar imágenes"}
             </button>
           </div>
@@ -726,30 +892,30 @@ function FolderDrawer({
   if (!folder) return null;
 
   return (
-    <div className="modal-backdrop drawer-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
-      <aside className="drawer folder-drawer" role="dialog" aria-modal="true" aria-labelledby="folder-title">
-        <div className="modal-head">
-          <div><p className="eyebrow">Carpeta de pedidos</p><h2 id="folder-title">{folder.name}</h2></div>
-          <button className="icon-button" onClick={onClose} aria-label="Cerrar"><CloseIcon /></button>
+    <div className={`${ui.modalBackdrop} ${ui.drawerBackdrop}`} role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
+      <aside className={ui.drawer} role="dialog" aria-modal="true" aria-labelledby="folder-title">
+        <div className={ui.modalHead}>
+          <div><p className={ui.eyebrow}>Carpeta de pedidos</p><h2 id="folder-title">{folder.name}</h2></div>
+          <button className={ui.iconButton} onClick={onClose} aria-label="Cerrar"><CloseIcon /></button>
         </div>
-        <div className="folder-summary-strip">
+        <div className={ui.folderSummary}>
           <span><strong>{orders.length}</strong>Pedidos</span>
           <span><strong>{orders.filter((order) => order.status === "Pendiente").length}</strong>Pendientes</span>
           <span><strong>{orders.reduce((total, order) => total + order.images.length, 0)}</strong>Imágenes</span>
         </div>
-        <div className="folder-order-list">
+        <div className={ui.folderOrderList}>
           {orders.map((order) => (
-            <button className="folder-order-card" key={order.id} onClick={() => onSelectOrder(order)}>
-              <span className="order-cover" style={{ background: order.cover }}><ImageIcon /></span>
-              <span className="folder-order-copy">
+            <button className={ui.folderOrderCard} key={order.id} onClick={() => onSelectOrder(order)}>
+              <span className={ui.orderCover} style={{ background: order.cover }}><ImageIcon /></span>
+              <span className={ui.folderOrderCopy}>
                 <strong>{order.code}</strong>
                 <small>{order.images.length} imagen{order.images.length === 1 ? "" : "es"} · {formatDate(order.createdAt)}</small>
               </span>
-              <span className={`status-pill ${statusStyles[order.status]}`}><i />{order.status}</span>
+              <span className={`${ui.statusPill} ${statusStyles[order.status]}`}><i />{order.status}</span>
               <ArrowIcon />
             </button>
           ))}
-          {!orders.length && <div className="drawer-empty">Esta carpeta todavía no tiene pedidos.</div>}
+          {!orders.length && <div className={ui.drawerEmpty}>Esta carpeta todavía no tiene pedidos.</div>}
         </div>
       </aside>
     </div>
@@ -779,31 +945,38 @@ function OrderDrawer({
   }
 
   return (
-    <div className="modal-backdrop drawer-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
-      <aside className="drawer" role="dialog" aria-modal="true" aria-labelledby="order-title">
-        <div className="modal-head">
-          <div><p className="eyebrow">{order.code}</p><h2 id="order-title">{order.clientName}</h2></div>
-          <button className="icon-button" onClick={onClose} aria-label="Cerrar"><CloseIcon /></button>
+    <div className={`${ui.modalBackdrop} ${ui.drawerBackdrop}`} role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
+      <aside className={ui.drawer} role="dialog" aria-modal="true" aria-labelledby="order-title">
+        <div className={ui.modalHead}>
+          <div><p className={ui.eyebrow}>{order.code}</p><h2 id="order-title">{order.clientName}</h2></div>
+          <button className={ui.iconButton} onClick={onClose} aria-label="Cerrar"><CloseIcon /></button>
         </div>
-        <div className="drawer-content">
-          <label className="field"><span>Estado</span><select value={order.status} onChange={(event) => onStatusChange(event.target.value as OrderStatus)}>{statuses.map((status) => <option key={status}>{status}</option>)}</select></label>
-          <div className="detail-block"><span>Notas</span><p>{order.notes || "Sin notas para este pedido."}</p></div>
-          <div className="detail-block">
-            <div className="detail-title"><span>Imágenes</span><small>{order.images.length} archivos</small></div>
-            <div className="image-grid">
+        <div className={ui.drawerContent}>
+          <label className={ui.field}><span>Estado</span><select value={order.status} onChange={(event) => onStatusChange(event.target.value as OrderStatus)}>{statuses.map((status) => <option key={status}>{status}</option>)}</select></label>
+          <input ref={fileInput} type="file" accept="image/*" multiple hidden onChange={(event) => void addImages(Array.from(event.target.files ?? []))} />
+          <button className={`${ui.primaryButton} w-full`} disabled={uploading || order.status !== "Pendiente"} onClick={() => fileInput.current?.click()}>
+            <UploadIcon />
+            {uploading
+              ? "Subiendo..."
+              : order.status === "Pendiente"
+                ? "Agregar imágenes"
+                : "Pedido cerrado"}
+          </button>
+          <div className={`${ui.safetyNote} -mt-2`}><span>✓</span><p><strong>Destino confirmado</strong>Las imágenes se vinculan a {order.code} mediante su ID.</p></div>
+          <div className={ui.detailBlock}><span>Notas</span><p>{order.notes || "Sin notas para este pedido."}</p></div>
+          <div className={ui.detailBlock}>
+            <div className={ui.detailTitle}><span>Imágenes</span><small>{order.images.length} archivos</small></div>
+            <div className={ui.imageGrid}>
               {order.images.map((image, index) => (
-                <div className={`image-tile ${image.previewUrl ? "has-preview" : ""}`} key={image.id} style={image.previewUrl ? { backgroundImage: `url("${image.previewUrl}")` } : index === 0 ? { background: order.cover } : undefined}>
+                <div className={`${ui.imageTile} ${image.previewUrl ? ui.imagePreview : ""}`} key={image.id} style={image.previewUrl ? { backgroundImage: `url("${image.previewUrl}")` } : index === 0 ? { background: order.cover } : undefined}>
                   {!image.previewUrl && <ImageIcon />}
                   <small>{image.name}</small>
                   <time dateTime={image.addedAt}>{new Intl.DateTimeFormat("es-AR", { dateStyle: "short", timeStyle: "short" }).format(new Date(image.addedAt))}</time>
                 </div>
               ))}
-              {!order.images.length && <div className="drawer-empty">Todavía no hay imágenes.</div>}
+              {!order.images.length && <div className={ui.drawerEmpty}>Todavía no hay imágenes.</div>}
             </div>
           </div>
-          <div className="locked-target"><span>✓</span><p><strong>Destino bloqueado</strong>Las nuevas imágenes se asignarán a <b>{order.code}</b> mediante su ID interno.</p></div>
-          <input ref={fileInput} type="file" accept="image/*" multiple hidden onChange={(event) => void addImages(Array.from(event.target.files ?? []))} />
-          <button className="primary-button full-button" disabled={uploading} onClick={() => fileInput.current?.click()}><UploadIcon /> {uploading ? "Subiendo..." : `Agregar imágenes de ${order.clientName}`}</button>
         </div>
       </aside>
     </div>

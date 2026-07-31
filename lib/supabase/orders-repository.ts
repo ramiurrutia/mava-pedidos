@@ -1,0 +1,218 @@
+import {
+  type ClientFolder,
+  type Order,
+  type OrderImage,
+  type OrderStatus,
+} from "../orders";
+import { createClient } from "./client";
+
+const IMAGE_BUCKET = "order-images";
+
+type DatabaseStatus = "pending" | "in_production" | "finished" | "delivered";
+
+type ImageRow = {
+  id: string;
+  order_id: string;
+  storage_key: string;
+  original_filename: string;
+  created_at: string;
+  upload_status: "pending" | "ready" | "failed";
+};
+
+type OrderRow = {
+  id: string;
+  code: string;
+  client_id: string;
+  client_name: string;
+  status: DatabaseStatus;
+  notes: string;
+  created_at: string;
+  order_images?: ImageRow[] | null;
+};
+
+type PreparedImageRow = {
+  id: string;
+  order_id: string;
+  storage_key: string;
+  original_filename: string;
+  created_at: string;
+};
+
+const fromDatabaseStatus: Record<DatabaseStatus, OrderStatus> = {
+  pending: "Pendiente",
+  in_production: "En producción",
+  finished: "Terminado",
+  delivered: "Entregado",
+};
+
+const toDatabaseStatus: Record<OrderStatus, DatabaseStatus> = {
+  Pendiente: "pending",
+  "En producción": "in_production",
+  Terminado: "finished",
+  Entregado: "delivered",
+};
+
+const covers = [
+  "linear-gradient(145deg, #d9c1a5, #725649)",
+  "linear-gradient(145deg, #96b3b2, #314d52)",
+  "linear-gradient(145deg, #d9c7bb, #806d67)",
+  "linear-gradient(145deg, #95a67c, #374634)",
+];
+
+function normalizeRpcRow<T>(value: T | T[] | null): T {
+  const row = Array.isArray(value) ? value[0] : value;
+  if (!row) throw new Error("Supabase no devolvió el registro esperado.");
+  return row;
+}
+
+async function createSignedImage(image: ImageRow | PreparedImageRow): Promise<OrderImage> {
+  const supabase = createClient();
+  const { data, error } = await supabase.storage
+    .from(IMAGE_BUCKET)
+    .createSignedUrl(image.storage_key, 60 * 60);
+
+  return {
+    id: image.id,
+    pedidoId: image.order_id,
+    name: image.original_filename,
+    addedAt: image.created_at,
+    previewUrl: error ? undefined : data.signedUrl,
+  };
+}
+
+export async function loadWorkspace(): Promise<{ folders: ClientFolder[]; orders: Order[] }> {
+  const supabase = createClient();
+  const [foldersResult, ordersResult] = await Promise.all([
+    supabase.from("client_folders").select("id, name").order("name"),
+    supabase
+      .from("orders")
+      .select(`
+        id,
+        code,
+        client_id,
+        client_name,
+        status,
+        notes,
+        created_at,
+        order_images (
+          id,
+          order_id,
+          storage_key,
+          original_filename,
+          created_at,
+          upload_status
+        )
+      `)
+      .order("created_at", { ascending: false }),
+  ]);
+
+  if (foldersResult.error) throw foldersResult.error;
+  if (ordersResult.error) throw ordersResult.error;
+
+  const folders = foldersResult.data as ClientFolder[];
+  const rows = ordersResult.data as OrderRow[];
+  const orders = await Promise.all(rows.map(async (row, index): Promise<Order> => {
+    const readyImages = (row.order_images ?? []).filter((image) => image.upload_status === "ready");
+    return {
+      id: row.id,
+      code: row.code,
+      clientId: row.client_id,
+      clientName: row.client_name,
+      status: fromDatabaseStatus[row.status],
+      notes: row.notes,
+      createdAt: row.created_at,
+      images: await Promise.all(readyImages.map(createSignedImage)),
+      cover: covers[index % covers.length],
+    };
+  }));
+
+  return { folders, orders };
+}
+
+export async function createRemoteOrder(clientId: string, notes: string): Promise<Order> {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("create_order", {
+    requested_prefix: "CLASH",
+    requested_client_id: clientId,
+    requested_notes: notes,
+  });
+
+  if (error) throw error;
+  const row = normalizeRpcRow(data as OrderRow | OrderRow[] | null);
+  return {
+    id: row.id,
+    code: row.code,
+    clientId: row.client_id,
+    clientName: row.client_name,
+    status: fromDatabaseStatus[row.status],
+    notes: row.notes,
+    createdAt: row.created_at,
+    images: [],
+    cover: covers[0],
+  };
+}
+
+export async function updateRemoteOrderStatus(orderId: string, status: OrderStatus) {
+  const supabase = createClient();
+  const { error } = await supabase
+    .from("orders")
+    .update({ status: toDatabaseStatus[status] })
+    .eq("id", orderId);
+
+  if (error) throw error;
+}
+
+export async function uploadRemoteImages({
+  clientId,
+  orderId,
+  files,
+}: {
+  clientId: string;
+  orderId?: string;
+  files: File[];
+}): Promise<{ orderId: string; images: OrderImage[] }> {
+  const supabase = createClient();
+  const images: OrderImage[] = [];
+  let resolvedOrderId = orderId;
+
+  for (const file of files) {
+    if (file.size > 6 * 1024 * 1024) {
+      throw new Error(`${file.name} supera el límite de 6 MB.`);
+    }
+    const imageId = crypto.randomUUID();
+    const { data, error } = await supabase.rpc("prepare_order_image", {
+      requested_client_id: clientId,
+      requested_order_id: resolvedOrderId ?? null,
+      requested_image_id: imageId,
+      requested_filename: file.name,
+      requested_mime_type: file.type,
+      requested_size_bytes: file.size,
+    });
+
+    if (error) throw error;
+    const prepared = normalizeRpcRow(data as PreparedImageRow | PreparedImageRow[] | null);
+    resolvedOrderId = prepared.order_id;
+
+    const upload = await supabase.storage
+      .from(IMAGE_BUCKET)
+      .upload(prepared.storage_key, file, {
+        contentType: file.type,
+        upsert: false,
+      });
+
+    if (upload.error) {
+      await supabase.rpc("fail_order_image", { requested_image_id: prepared.id });
+      throw upload.error;
+    }
+
+    const completed = await supabase.rpc("complete_order_image", {
+      requested_image_id: prepared.id,
+    });
+    if (completed.error) throw completed.error;
+
+    images.push(await createSignedImage(prepared));
+  }
+
+  if (!resolvedOrderId) throw new Error("No se encontró un pedido pendiente.");
+  return { orderId: resolvedOrderId, images };
+}
