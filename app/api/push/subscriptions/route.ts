@@ -13,6 +13,14 @@ type SubscriptionBody = {
   };
 };
 
+export function GET() {
+  const publicKey = process.env.VAPID_PUBLIC_KEY ?? process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+  return NextResponse.json(
+    { configured: Boolean(publicKey), publicKey: publicKey ?? null },
+    { headers: { "Cache-Control": "no-store" } },
+  );
+}
+
 export async function POST(request: Request) {
   try {
     const body = await request.json() as SubscriptionBody;
