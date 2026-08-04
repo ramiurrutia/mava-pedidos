@@ -7,6 +7,11 @@ export {
   FiFolder as FolderIcon,
   FiMoreHorizontal as MoreIcon,
   FiChevronRight as ArrowIcon,
-  FiX as CloseIcon,
+  FiArrowLeft as BackIcon,
   FiUploadCloud as UploadIcon,
+  FiBell as BellIcon,
+  FiBellOff as BellOffIcon,
+  FiEdit2 as EditIcon,
+  FiTrash2 as TrashIcon,
+  FiSave as SaveIcon,
 } from "react-icons/fi";

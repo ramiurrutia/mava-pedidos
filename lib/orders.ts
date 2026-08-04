@@ -13,6 +13,16 @@ export type OrderImage = {
   previewUrl?: string;
 };
 
+export type OrderItem = {
+  id: string;
+  code: string;
+  name: string;
+  size: string;
+  price: number;
+  background?: string;
+  backgroundLabel?: string;
+};
+
 export type Order = {
   id: string;
   code: string;
@@ -23,41 +33,28 @@ export type Order = {
   createdAt: string;
   images: OrderImage[];
   cover: string;
+  sourceSystem?: string;
+  sourceOrderId?: string;
+  sourceStatus?: string;
+  contactName?: string;
+  whatsapp?: string;
+  items?: OrderItem[];
+  total?: number;
 };
+
+export const MAVA_STOCK_SOURCE = "MAVA STOCK";
+export const MAVA_STOCK_FOLDER_ID = "mava-stock";
+
+export function isMavaStockOrder(order: Order) {
+  return order.sourceSystem === MAVA_STOCK_SOURCE;
+}
 
 export function findLatestPendingOrder(orders: Order[], clientId: string) {
   return orders
-    .filter((order) => order.clientId === clientId && order.status === "Pendiente")
+    .filter((order) => order.clientId === clientId && isOrderActive(order.status))
     .sort((left, right) => Date.parse(right.createdAt) - Date.parse(left.createdAt))[0];
 }
 
-export function fileToOrderImage(file: File, pedidoId: string): Promise<OrderImage> {
-  return new Promise((resolve, reject) => {
-    if (!file.type.startsWith("image/")) {
-      reject(new Error("El archivo seleccionado no es una imagen."));
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onerror = () => reject(new Error("No se pudo leer la imagen."));
-    reader.onload = () => resolve({
-      id: crypto.randomUUID(),
-      pedidoId,
-      name: file.name,
-      addedAt: new Date().toISOString(),
-      previewUrl: typeof reader.result === "string" ? reader.result : undefined,
-    });
-    reader.readAsDataURL(file);
-  });
-}
-
-export function folderIdFromName(name: string) {
-  const normalized = name
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLocaleLowerCase("es")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/(^-|-$)/g, "");
-
-  return `folder-${normalized || "sin-nombre"}`;
+export function isOrderActive(status: OrderStatus) {
+  return status === "Pendiente" || status === "En producción";
 }

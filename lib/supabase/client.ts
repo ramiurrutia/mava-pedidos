@@ -1,4 +1,13 @@
-import { createClient as createSupabaseClient } from "@supabase/supabase-js";
+import {
+  createClient as createSupabaseClient,
+  type SupabaseClient,
+} from "@supabase/supabase-js";
+
+type SupabaseGlobal = typeof globalThis & {
+  __mavaSupabaseClient?: SupabaseClient;
+};
+
+const supabaseGlobal = globalThis as SupabaseGlobal;
 
 export function isSupabaseConfigured() {
   return Boolean(
@@ -15,5 +24,13 @@ export function createClient() {
     throw new Error("Supabase no está configurado. Revisa las variables de entorno.");
   }
 
-  return createSupabaseClient(url, key);
+  supabaseGlobal.__mavaSupabaseClient ??= createSupabaseClient(url, key, {
+    auth: {
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+      persistSession: false,
+    },
+  });
+
+  return supabaseGlobal.__mavaSupabaseClient;
 }

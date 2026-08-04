@@ -11,20 +11,6 @@
   }
 }
 
-@keyframes modal-in {
-  from {
-    opacity: 0;
-    transform: translateY(8px) scale(.98);
-  }
-}
-
-@keyframes drawer-in {
-  from {
-    opacity: .7;
-    transform: translateX(30px);
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
