@@ -68,6 +68,8 @@ create table public.order_images (
   storage_key text not null unique,
   original_filename text not null constraint order_images_filename_check
     check (length(trim(original_filename)) between 1 and 255),
+  description text not null default '' constraint order_images_description_length_check
+    check (length(description) <= 1000),
   mime_type text not null constraint order_images_mime_type_check
     check (mime_type in ('image/jpeg', 'image/png', 'image/webp', 'image/gif')),
   size_bytes bigint not null constraint order_images_size_limit_check
@@ -260,6 +262,42 @@ for each row execute function public.apply_order_update_metadata();
 create trigger orders_record_status_change
 after update of status on public.orders
 for each row execute function public.record_order_status_change();
+
+create or replace function public.assign_generic_order_code()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  base_code text;
+  generated_code text;
+  code_suffix integer := 1;
+begin
+  base_code := 'PEDIDO-' || to_char(
+    timezone('America/Argentina/Buenos_Aires', coalesce(new.created_at, now())),
+    'DDMMYYYY-HH24MI'
+  );
+  perform pg_advisory_xact_lock(hashtext('public-order-code:' || base_code));
+
+  generated_code := base_code;
+  while exists (select 1 from public.orders where code = generated_code) loop
+    code_suffix := code_suffix + 1;
+    generated_code := base_code || '-' || lpad(
+      code_suffix::text,
+      greatest(2, length(code_suffix::text)),
+      '0'
+    );
+  end loop;
+
+  new.code := generated_code;
+  return new;
+end;
+$$;
+
+create trigger orders_assign_generic_code
+before insert on public.orders
+for each row execute function public.assign_generic_order_code();
 
 create or replace function public.create_order(
   requested_prefix text,
@@ -591,7 +629,8 @@ create or replace function public.prepare_order_image(
   requested_image_id uuid,
   requested_filename text,
   requested_mime_type text,
-  requested_size_bytes bigint
+  requested_size_bytes bigint,
+  requested_description text default ''
 ) returns public.order_images
 language plpgsql
 security definer
@@ -612,6 +651,10 @@ begin
 
   if requested_size_bytes not between 1 and 6291456 then
     raise exception 'IMAGE_SIZE_OUT_OF_RANGE';
+  end if;
+
+  if length(coalesce(requested_description, '')) > 1000 then
+    raise exception 'IMAGE_DESCRIPTION_TOO_LONG';
   end if;
 
   if requested_order_id is not null then
@@ -649,6 +692,7 @@ begin
     order_id,
     storage_key,
     original_filename,
+    description,
     mime_type,
     size_bytes,
     uploaded_by
@@ -658,6 +702,7 @@ begin
     target_order_id,
     'orders/' || target_order_id || '/' || requested_image_id || '/' || safe_filename,
     requested_filename,
+    trim(coalesce(requested_description, '')),
     requested_mime_type,
     requested_size_bytes,
     null
@@ -713,6 +758,41 @@ begin
   set upload_status = 'failed'
   where id = requested_image_id
     and upload_status = 'pending';
+end;
+$$;
+
+create or replace function public.update_order_image_description(
+  requested_image_id uuid,
+  requested_description text
+) returns text
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  saved_description text;
+begin
+  if length(coalesce(requested_description, '')) > 1000 then
+    raise exception 'IMAGE_DESCRIPTION_TOO_LONG';
+  end if;
+
+  update public.order_images
+  set description = trim(coalesce(requested_description, ''))
+  where id = requested_image_id
+    and upload_status = 'ready'
+    and exists (
+      select 1
+      from public.orders
+      where orders.id = order_images.order_id
+        and orders.deleted_at is null
+    )
+  returning description into saved_description;
+
+  if not found then
+    raise exception 'IMAGE_NOT_FOUND';
+  end if;
+
+  return saved_description;
 end;
 $$;
 
@@ -776,13 +856,15 @@ revoke all on function public.create_order(text, text, text) from public;
 revoke all on function public.import_external_order(text, text, text, text, text, jsonb, text, text, numeric, timestamptz, text) from public;
 revoke all on function public.update_order_details(uuid, text, text, text, text) from public;
 revoke all on function public.soft_delete_order(uuid) from public;
-revoke all on function public.prepare_order_image(uuid, uuid, uuid, text, text, bigint) from public;
+revoke all on function public.prepare_order_image(uuid, uuid, uuid, text, text, bigint, text) from public;
+revoke all on function public.update_order_image_description(uuid, text) from public;
 revoke all on function public.complete_order_image(uuid) from public;
 revoke all on function public.fail_order_image(uuid) from public;
 revoke all on function public.claim_pending_order_notifications(uuid[]) from public;
 revoke all on function public.enqueue_new_order_notification() from public;
 revoke all on function public.preserve_locally_edited_order_details() from public;
 revoke all on function public.reject_images_for_deleted_orders() from public;
+revoke all on function public.assign_generic_order_code() from public;
 
 revoke all on public.push_subscriptions from anon, authenticated;
 revoke all on public.push_notification_events from anon, authenticated;
@@ -796,7 +878,8 @@ grant execute on function public.create_order(text, text, text) to anon, authent
 grant execute on function public.import_external_order(text, text, text, text, text, jsonb, text, text, numeric, timestamptz, text) to service_role;
 grant execute on function public.update_order_details(uuid, text, text, text, text) to anon, authenticated;
 grant execute on function public.soft_delete_order(uuid) to anon, authenticated;
-grant execute on function public.prepare_order_image(uuid, uuid, uuid, text, text, bigint) to anon, authenticated;
+grant execute on function public.prepare_order_image(uuid, uuid, uuid, text, text, bigint, text) to anon, authenticated;
+grant execute on function public.update_order_image_description(uuid, text) to anon, authenticated;
 grant execute on function public.complete_order_image(uuid) to anon, authenticated;
 grant execute on function public.fail_order_image(uuid) to anon, authenticated;
 grant execute on function public.claim_pending_order_notifications(uuid[]) to service_role;

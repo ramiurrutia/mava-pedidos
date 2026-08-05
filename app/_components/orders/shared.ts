@@ -1,4 +1,4 @@
-import type { Order, OrderStatus } from "../../../lib/orders";
+import type { OrderStatus } from "../../../lib/orders";
 
 export type DashboardView = "resumen" | "pedidos" | "carpetas" | "nuevo" | "subir" | "pedido" | "carpeta";
 export type WorkspaceView = Extract<DashboardView, "resumen" | "pedidos" | "carpetas">;
@@ -94,23 +94,4 @@ export function formatCurrency(value: number) {
     maximumFractionDigits: 0,
     style: "currency",
   }).format(value);
-}
-
-export function getNextCode(orders: Order[]) {
-  const now = new Date();
-  const date = [
-    String(now.getDate()).padStart(2, "0"),
-    String(now.getMonth() + 1).padStart(2, "0"),
-    now.getFullYear(),
-  ].join("");
-  const time = [
-    String(now.getHours()).padStart(2, "0"),
-    String(now.getMinutes()).padStart(2, "0"),
-  ].join("");
-  const baseCode = `CLASH-${date}-${time}`;
-  const matches = orders.filter((order) => (
-    order.code === baseCode || order.code.startsWith(`${baseCode}-`)
-  )).length;
-
-  return matches === 0 ? baseCode : `${baseCode}-${String(matches + 1).padStart(2, "0")}`;
 }

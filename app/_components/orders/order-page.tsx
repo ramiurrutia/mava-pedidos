@@ -1,9 +1,17 @@
 "use client";
 
-import { useRef, useState } from "react";
-import { isOrderActive, type Order, type OrderStatus } from "../../../lib/orders";
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  createPendingImageUploads,
+  isOrderActive,
+  type Order,
+  type OrderImage,
+  type OrderStatus,
+  type PendingImageUpload,
+} from "../../../lib/orders";
 import type { OrderDetailsInput } from "../../../lib/supabase/orders-repository";
-import { BackIcon, EditIcon, ImageIcon, SaveIcon, TrashIcon, UploadIcon } from "../icons";
+import { BackIcon, CloseIcon, EditIcon, ImageIcon, SaveIcon, TrashIcon, UploadIcon } from "../icons";
+import { ImageDescriptionEditor } from "./image-description-editor";
 import { formatCurrency, statuses, ui } from "./shared";
 
 export function OrderPage({
@@ -12,33 +20,105 @@ export function OrderPage({
   onStatusChange,
   onAddImages,
   onEdit,
+  onEditImageDescription,
   onDelete,
 }: {
   order: Order;
   onClose: () => void;
   onStatusChange: (status: OrderStatus) => void;
-  onAddImages: (files: File[]) => Promise<boolean>;
+  onAddImages: (uploads: PendingImageUpload[]) => Promise<boolean>;
   onEdit: (input: OrderDetailsInput) => Promise<boolean>;
+  onEditImageDescription: (imageId: string, description: string) => Promise<string | null>;
   onDelete: () => Promise<boolean>;
 }) {
   const fileInput = useRef<HTMLInputElement>(null);
+  const [pendingUploads, setPendingUploads] = useState<PendingImageUpload[]>([]);
   const [uploading, setUploading] = useState(false);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [selectedImage, setSelectedImage] = useState<OrderImage | null>(null);
+  const [editingImageDescription, setEditingImageDescription] = useState(false);
+  const [imageDescriptionDraft, setImageDescriptionDraft] = useState("");
+  const [savingImageDescription, setSavingImageDescription] = useState(false);
   const [clientName, setClientName] = useState(order.clientName);
   const [contactName, setContactName] = useState(order.contactName ?? "");
   const [whatsapp, setWhatsapp] = useState(order.whatsapp ?? "");
   const [notes, setNotes] = useState(order.notes);
   const canAddImages = isOrderActive(order.status);
 
-  async function addImages(files: File[]) {
+  const closeImageViewer = useCallback(() => {
+    if (selectedImage && window.history.state?.mavaImageViewer === selectedImage.id) {
+      window.history.back();
+      return;
+    }
+    setSelectedImage(null);
+  }, [selectedImage]);
+
+  useEffect(() => {
+    function closeViewerFromHistory() {
+      setSelectedImage(null);
+    }
+
+    window.addEventListener("popstate", closeViewerFromHistory);
+    return () => window.removeEventListener("popstate", closeViewerFromHistory);
+  }, []);
+
+  useEffect(() => {
+    if (!selectedImage) return;
+
+    function closeWithEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") closeImageViewer();
+    }
+
+    window.addEventListener("keydown", closeWithEscape);
+    return () => window.removeEventListener("keydown", closeWithEscape);
+  }, [selectedImage, closeImageViewer]);
+
+  function selectImages(files: File[]) {
     if (!files.length) return;
+    setPendingUploads(createPendingImageUploads(files));
+  }
+
+  async function addImages() {
+    if (!pendingUploads.length || uploading) return;
     setUploading(true);
-    await onAddImages(files);
+    const uploaded = await onAddImages(pendingUploads);
     setUploading(false);
+    if (!uploaded) return;
+
+    setPendingUploads([]);
     if (fileInput.current) fileInput.current.value = "";
+  }
+
+  function cancelImages() {
+    setPendingUploads([]);
+    if (fileInput.current) fileInput.current.value = "";
+  }
+
+  function openImageViewer(image: OrderImage) {
+    window.history.pushState({ ...window.history.state, mavaImageViewer: image.id }, "");
+    setSelectedImage(image);
+    setImageDescriptionDraft(image.description);
+    setEditingImageDescription(false);
+  }
+
+  async function saveImageDescription(event: React.FormEvent) {
+    event.preventDefault();
+    if (!selectedImage || savingImageDescription) return;
+    setSavingImageDescription(true);
+    const savedDescription = await onEditImageDescription(selectedImage.id, imageDescriptionDraft);
+    setSavingImageDescription(false);
+    if (savedDescription === null) return;
+
+    setSelectedImage((currentImage) => (
+      currentImage?.id === selectedImage.id
+        ? { ...currentImage, description: savedDescription }
+        : currentImage
+    ));
+    setImageDescriptionDraft(savedDescription);
+    setEditingImageDescription(false);
   }
 
   function startEditing() {
@@ -146,11 +226,24 @@ export function OrderPage({
               </div>
             </form>
           )}
-          <input ref={fileInput} type="file" accept="image/*" multiple hidden onChange={(event) => void addImages(Array.from(event.target.files ?? []))} />
-          <button className={`${ui.primaryButton} w-full`} disabled={uploading || !canAddImages} onClick={() => fileInput.current?.click()}>
-            <UploadIcon />
-            {uploading ? "Subiendo..." : canAddImages ? "Agregar imágenes" : "Pedido cerrado"}
-          </button>
+
+          <input ref={fileInput} type="file" accept="image/*" multiple hidden onChange={(event) => selectImages(Array.from(event.target.files ?? []))} />
+          {!pendingUploads.length ? (
+            <button className={`${ui.primaryButton} w-full`} disabled={uploading || !canAddImages} onClick={() => fileInput.current?.click()} type="button">
+              <UploadIcon />
+              {canAddImages ? "Agregar imágenes" : "Pedido cerrado"}
+            </button>
+          ) : (
+            <div className="grid gap-4 rounded-xl border border-[#dfe5e1] bg-[#fafbf9] p-4">
+              <ImageDescriptionEditor onChange={setPendingUploads} uploads={pendingUploads} />
+              <div className="flex justify-end gap-2">
+                <button className={ui.secondaryButton} disabled={uploading} onClick={cancelImages} type="button">Cancelar</button>
+                <button className={ui.primaryButton} disabled={uploading} onClick={() => void addImages()} type="button">
+                  <UploadIcon />{uploading ? "Subiendo..." : `Subir ${pendingUploads.length} imagen${pendingUploads.length === 1 ? "" : "es"}`}
+                </button>
+              </div>
+            </div>
+          )}
           <div className={`${ui.safetyNote} -mt-2`}><span>✓</span><p><strong>Destino confirmado</strong>Las imágenes se vinculan a {order.code} mediante su ID.</p></div>
           {!editing && (order.sourceSystem || order.contactName || order.whatsapp) && (
             <div className="grid grid-cols-2 gap-3 rounded-lg border border-[#e4e7e3] bg-[#fafbf9] p-3 max-[480px]:grid-cols-1">
@@ -188,21 +281,84 @@ export function OrderPage({
             <div className={ui.detailTitle}><span>Imágenes</span><small>{order.images.length} archivos</small></div>
             <div className={ui.imageGrid}>
               {order.images.map((image, index) => (
-                <div
-                  className={`${ui.imageTile} ${image.previewUrl ? ui.imagePreview : ""}`}
+                <button
+                  aria-label={`Abrir ${image.name}`}
+                  className={`${ui.imageTile} ${image.previewUrl ? ui.imagePreview : ""} cursor-pointer border-0 text-left transition-transform hover:scale-[1.015] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#235c4c]`}
                   key={image.id}
+                  onClick={() => openImageViewer(image)}
                   style={image.previewUrl ? { backgroundImage: `url("${image.previewUrl}")` } : index === 0 ? { background: order.cover } : undefined}
+                  type="button"
                 >
                   {!image.previewUrl && <ImageIcon />}
-                  <small>{image.name}</small>
+                  <small>{image.description || image.name}</small>
                   <time dateTime={image.addedAt}>{new Intl.DateTimeFormat("es-AR", { dateStyle: "short", timeStyle: "short" }).format(new Date(image.addedAt))}</time>
-                </div>
+                </button>
               ))}
               {!order.images.length && <div className={ui.detailEmpty}>Todavía no hay imágenes.</div>}
             </div>
           </div>
         </div>
       </div>
+
+      {selectedImage && (
+        <div className="fixed inset-0 z-80 flex flex-col bg-[#111715]/95 text-white" role="dialog" aria-label={`Imagen ${selectedImage.name}`} aria-modal="true">
+          <div className="flex items-center justify-between gap-3 border-b border-white/10 px-4 py-3">
+            <div className="min-w-0">
+              <strong className="block truncate text-sm font-semibold">{selectedImage.name}</strong>
+              <span className="mt-0.5 block text-[10px] text-white/55">{order.code}</span>
+            </div>
+            <button aria-label="Cerrar imagen" className="grid size-10 shrink-0 place-items-center rounded-full bg-white/10 text-white transition hover:bg-white/20 [&_svg]:size-5" onClick={closeImageViewer} type="button"><CloseIcon /></button>
+          </div>
+          <div className="min-h-0 flex-1 bg-contain bg-center bg-no-repeat" style={selectedImage.previewUrl ? { backgroundImage: `url("${selectedImage.previewUrl}")` } : undefined}>
+            {!selectedImage.previewUrl && <div className="grid h-full place-items-center text-white/50"><ImageIcon /></div>}
+          </div>
+          <div className="border-t border-white/10 bg-[#171e1b] px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-4">
+            {editingImageDescription ? (
+              <form className="grid gap-3" onSubmit={saveImageDescription}>
+                <div className="flex items-center justify-between gap-3">
+                  <label className="text-[9px] font-bold uppercase tracking-[.12em] text-white/45" htmlFor="image-description">Descripción</label>
+                  <small className="text-[9px] text-white/45">{imageDescriptionDraft.length}/1000</small>
+                </div>
+                <textarea
+                  autoFocus
+                  className="min-h-24 w-full resize-y rounded-lg border border-white/15 bg-white/10 p-3 text-sm leading-relaxed text-white outline-none placeholder:text-white/35 focus:border-white/40"
+                  id="image-description"
+                  maxLength={1000}
+                  onChange={(event) => setImageDescriptionDraft(event.target.value)}
+                  placeholder="Editar descripción"
+                  value={imageDescriptionDraft}
+                />
+                <div className="flex justify-end gap-2">
+                  <button
+                    className="min-h-10 rounded-lg border border-white/15 px-4 text-xs font-semibold text-white/80 transition hover:bg-white/10 disabled:opacity-50"
+                    disabled={savingImageDescription}
+                    onClick={() => {
+                      setImageDescriptionDraft(selectedImage.description);
+                      setEditingImageDescription(false);
+                    }}
+                    type="button"
+                  >
+                    Cancelar
+                  </button>
+                  <button className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-white px-4 text-xs font-semibold text-[#1e2a25] transition hover:bg-[#eef2ef] disabled:opacity-50" disabled={savingImageDescription} type="submit">
+                    <SaveIcon />{savingImageDescription ? "Guardando..." : "Guardar"}
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <div>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-[9px] font-bold uppercase tracking-[.12em] text-white/45">Descripción</span>
+                  <button className="inline-flex min-h-9 items-center gap-2 rounded-lg bg-white/10 px-3 text-[10px] font-semibold text-white transition hover:bg-white/20" onClick={() => setEditingImageDescription(true)} type="button">
+                    <EditIcon /> Editar
+                  </button>
+                </div>
+                <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-white/90">{selectedImage.description || "Sin descripción para esta imagen."}</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </section>
   );
 }

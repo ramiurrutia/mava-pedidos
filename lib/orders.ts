@@ -9,9 +9,19 @@ export type OrderImage = {
   id: string;
   pedidoId: string;
   name: string;
+  description: string;
   addedAt: string;
   previewUrl?: string;
 };
+
+export type PendingImageUpload = {
+  file: File;
+  description: string;
+};
+
+export function createPendingImageUploads(files: File[]): PendingImageUpload[] {
+  return files.map((file) => ({ file, description: "" }));
+}
 
 export type OrderItem = {
   id: string;

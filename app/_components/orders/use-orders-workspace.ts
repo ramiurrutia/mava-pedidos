@@ -8,6 +8,7 @@ import {
   type ClientFolder,
   type Order,
   type OrderStatus,
+  type PendingImageUpload,
 } from "../../../lib/orders";
 import { isSupabaseConfigured } from "../../../lib/supabase/client";
 import {
@@ -15,6 +16,7 @@ import {
   deleteRemoteOrder,
   loadWorkspace,
   updateRemoteOrderDetails,
+  updateRemoteImageDescription,
   updateRemoteOrderStatus,
   uploadRemoteImages,
   type OrderDetailsInput,
@@ -132,7 +134,7 @@ export function useOrdersWorkspace() {
     }));
   }
 
-  async function createOrder(input: { clientName: string; notes: string; files: File[] }) {
+  async function createOrder(input: { clientName: string; notes: string; uploads: PendingImageUpload[] }) {
     if (dataSource !== "supabase") return false;
     const clientName = input.clientName.trim();
     if (!clientName) return false;
@@ -150,7 +152,7 @@ export function useOrdersWorkspace() {
       return false;
     }
 
-    if (!input.files.length) {
+    if (!input.uploads.length) {
       sileo.success({
         title: "Pedido creado",
         description: `${order.code} se guardó correctamente en ${order.clientName}.`,
@@ -162,11 +164,11 @@ export function useOrdersWorkspace() {
       const upload = await uploadRemoteImages({
         clientId: order.clientId,
         orderId: order.id,
-        files: input.files,
+        uploads: input.uploads,
       });
       order = { ...order, images: upload.images };
       prependImages(order.id, upload.images);
-      notifyCreatedOrderUpload(order, input.files.length, upload.failedFiles);
+      notifyCreatedOrderUpload(order, input.uploads.length, upload.failedFiles);
     } catch {
       sileo.warning({
         title: "Pedido creado sin imágenes",
@@ -222,6 +224,34 @@ export function useOrdersWorkspace() {
     }
   }
 
+  async function updateImageDescription(orderId: string, imageId: string, description: string) {
+    if (dataSource !== "supabase") return null;
+    try {
+      const savedDescription = await updateRemoteImageDescription(imageId, description);
+      setOrders((currentOrders) => currentOrders.map((order) => (
+        order.id === orderId
+          ? {
+              ...order,
+              images: order.images.map((image) => (
+                image.id === imageId ? { ...image, description: savedDescription } : image
+              )),
+            }
+          : order
+      )));
+      sileo.success({
+        title: "Descripción actualizada",
+        description: "La nota de la imagen se guardó correctamente.",
+      });
+      return savedDescription;
+    } catch {
+      sileo.error({
+        title: "No se pudo guardar la descripción",
+        description: "La nota anterior se mantuvo. Intenta nuevamente.",
+      });
+      return null;
+    }
+  }
+
   async function deleteOrder(id: string) {
     if (dataSource !== "supabase") return false;
     try {
@@ -243,8 +273,8 @@ export function useOrdersWorkspace() {
     }
   }
 
-  async function uploadImagesToFolder(clientId: string, files: File[], requestedOrderId?: string) {
-    if (dataSource !== "supabase" || !files.length) return false;
+  async function uploadImagesToFolder(clientId: string, uploads: PendingImageUpload[], requestedOrderId?: string) {
+    if (dataSource !== "supabase" || !uploads.length) return false;
     const folder = folders.find((candidate) => candidate.id === clientId);
     if (!folder) {
       sileo.error({
@@ -273,12 +303,12 @@ export function useOrdersWorkspace() {
       const upload = await uploadRemoteImages({
         clientId,
         orderId: targetOrder.id,
-        files,
+        uploads,
       });
       if (upload.images.length) {
         prependImages(targetOrder.id, upload.images);
       }
-      notifyExistingOrderUpload(folder.name, files.length, upload.images.length, upload.failedFiles);
+      notifyExistingOrderUpload(folder.name, uploads.length, upload.images.length, upload.failedFiles);
       return upload.images.length > 0;
     } catch {
       sileo.error({
@@ -289,8 +319,8 @@ export function useOrdersWorkspace() {
     }
   }
 
-  async function createPendingOrderWithImages(clientId: string, files: File[]) {
-    if (dataSource !== "supabase" || !files.length) return false;
+  async function createPendingOrderWithImages(clientId: string, uploads: PendingImageUpload[]) {
+    if (dataSource !== "supabase" || !uploads.length) return false;
     const folder = folders.find((candidate) => candidate.id === clientId);
     if (!folder) return false;
 
@@ -310,11 +340,11 @@ export function useOrdersWorkspace() {
       const upload = await uploadRemoteImages({
         clientId: folder.id,
         orderId: order.id,
-        files,
+        uploads,
       });
       order = { ...order, images: upload.images };
       prependImages(order.id, upload.images);
-      notifyCreatedOrderUpload(order, files.length, upload.failedFiles);
+      notifyCreatedOrderUpload(order, uploads.length, upload.failedFiles);
     } catch {
       sileo.warning({
         title: "Pedido creado sin imágenes",
@@ -333,6 +363,7 @@ export function useOrdersWorkspace() {
     createOrder,
     updateStatus,
     updateOrderDetails,
+    updateImageDescription,
     deleteOrder,
     uploadImagesToFolder,
     createPendingOrderWithImages,

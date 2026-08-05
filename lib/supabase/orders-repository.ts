@@ -4,6 +4,7 @@ import {
   type OrderImage,
   type OrderItem,
   type OrderStatus,
+  type PendingImageUpload,
 } from "../orders";
 import { createClient } from "./client";
 
@@ -16,6 +17,7 @@ type ImageRow = {
   order_id: string;
   storage_key: string;
   original_filename: string;
+  description: string;
   created_at: string;
   upload_status: "pending" | "ready" | "failed";
 };
@@ -43,6 +45,7 @@ type PreparedImageRow = {
   order_id: string;
   storage_key: string;
   original_filename: string;
+  description: string;
   created_at: string;
 };
 
@@ -95,6 +98,7 @@ async function createSignedImage(image: ImageRow | PreparedImageRow): Promise<Or
     id: image.id,
     pedidoId: image.order_id,
     name: image.original_filename,
+    description: image.description,
     addedAt: image.created_at,
     previewUrl: error ? undefined : data.signedUrl,
   };
@@ -126,6 +130,7 @@ export async function loadWorkspace(): Promise<{ folders: ClientFolder[]; orders
           order_id,
           storage_key,
           original_filename,
+          description,
           created_at,
           upload_status
         )
@@ -142,7 +147,9 @@ export async function loadWorkspace(): Promise<{ folders: ClientFolder[]; orders
   const folders = (foldersResult.data as ClientFolder[])
     .filter((folder) => visibleFolderIds.has(folder.id));
   const orders = await Promise.all(rows.map(async (row, index): Promise<Order> => {
-    const readyImages = (row.order_images ?? []).filter((image) => image.upload_status === "ready");
+    const readyImages = (row.order_images ?? [])
+      .filter((image) => image.upload_status === "ready")
+      .sort((left, right) => Date.parse(right.created_at) - Date.parse(left.created_at));
     return {
       id: row.id,
       code: row.code,
@@ -169,6 +176,7 @@ export async function loadWorkspace(): Promise<{ folders: ClientFolder[]; orders
 export async function createRemoteOrder(clientName: string, notes: string): Promise<Order> {
   const supabase = createClient();
   const { data, error } = await supabase.rpc("create_order", {
+    // La clave conserva la secuencia histórica; Supabase publica el código como PEDIDO-DDMMAAAA-HHMM.
     requested_prefix: "CLASH",
     requested_client_name: clientName,
     requested_notes: notes,
@@ -230,6 +238,17 @@ export async function updateRemoteOrderDetails(orderId: string, input: OrderDeta
   };
 }
 
+export async function updateRemoteImageDescription(imageId: string, description: string) {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("update_order_image_description", {
+    requested_image_id: imageId,
+    requested_description: description.trim(),
+  });
+  if (error) throw error;
+  if (typeof data !== "string") throw new Error("IMAGE_NOT_FOUND");
+  return data;
+}
+
 export async function deleteRemoteOrder(orderId: string) {
   const supabase = createClient();
   const { data, error } = await supabase.rpc("soft_delete_order", {
@@ -242,18 +261,19 @@ export async function deleteRemoteOrder(orderId: string) {
 export async function uploadRemoteImages({
   clientId,
   orderId,
-  files,
+  uploads,
 }: {
   clientId: string;
   orderId?: string;
-  files: File[];
+  uploads: PendingImageUpload[];
 }): Promise<{ orderId: string; images: OrderImage[]; failedFiles: UploadFailure[] }> {
   const supabase = createClient();
   const images: OrderImage[] = [];
   const failedFiles: UploadFailure[] = [];
   let resolvedOrderId = orderId;
 
-  for (const file of files) {
+  for (const item of uploads) {
+    const { file } = item;
     let prepared: PreparedImageRow | undefined;
     try {
       if (file.size > 6 * 1024 * 1024) {
@@ -268,6 +288,7 @@ export async function uploadRemoteImages({
         requested_filename: file.name,
         requested_mime_type: file.type,
         requested_size_bytes: file.size,
+        requested_description: item.description.trim(),
       });
 
       if (error) throw error;
@@ -301,5 +322,6 @@ export async function uploadRemoteImages({
   }
 
   if (!resolvedOrderId) throw new Error("No se encontró un pedido activo.");
+  images.sort((left, right) => Date.parse(right.addedAt) - Date.parse(left.addedAt));
   return { orderId: resolvedOrderId, images, failedFiles };
 }

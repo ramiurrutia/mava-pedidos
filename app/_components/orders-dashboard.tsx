@@ -69,7 +69,7 @@ export function OrdersDashboard({
         />
       ) : view === "pedido" && routeOrder ? (
         <OrderPage
-          onAddImages={(files) => workspace.uploadImagesToFolder(routeOrder.clientId, files, routeOrder.id)}
+          onAddImages={(uploads) => workspace.uploadImagesToFolder(routeOrder.clientId, uploads, routeOrder.id)}
           onClose={() => router.back()}
           onDelete={async () => {
             const deleted = await workspace.deleteOrder(routeOrder.id);
@@ -77,6 +77,7 @@ export function OrdersDashboard({
             return deleted;
           }}
           onEdit={(details) => workspace.updateOrderDetails(routeOrder.id, details)}
+          onEditImageDescription={(imageId, description) => workspace.updateImageDescription(routeOrder.id, imageId, description)}
           onStatusChange={(status) => workspace.updateStatus(routeOrder.id, status)}
           order={routeOrder}
         />

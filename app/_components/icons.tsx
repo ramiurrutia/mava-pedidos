@@ -14,4 +14,5 @@ export {
   FiEdit2 as EditIcon,
   FiTrash2 as TrashIcon,
   FiSave as SaveIcon,
+  FiX as CloseIcon,
 } from "react-icons/fi";

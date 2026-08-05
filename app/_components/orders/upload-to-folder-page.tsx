@@ -2,9 +2,17 @@
 
 import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { isOrderActive, type ClientFolder, type Order } from "../../../lib/orders";
-import { BackIcon, ImageIcon, UploadIcon } from "../icons";
+import {
+  createPendingImageUploads,
+  isOrderActive,
+  type ClientFolder,
+  type Order,
+  type PendingImageUpload,
+} from "../../../lib/orders";
+import { BackIcon, UploadIcon } from "../icons";
 import { ui } from "./shared";
+import { ImageDescriptionEditor } from "./image-description-editor";
+import { SelectedImageThumbnails } from "./local-image-preview";
 
 export function UploadToFolderPage({
   folders,
@@ -16,12 +24,12 @@ export function UploadToFolderPage({
   folders: ClientFolder[];
   orders: Order[];
   onClose: () => void;
-  onUpload: (clientId: string, files: File[], orderId?: string) => Promise<boolean>;
-  onCreateNew: (clientId: string, files: File[]) => Promise<boolean>;
+  onUpload: (clientId: string, uploads: PendingImageUpload[], orderId?: string) => Promise<boolean>;
+  onCreateNew: (clientId: string, uploads: PendingImageUpload[]) => Promise<boolean>;
 }) {
   const [clientId, setClientId] = useState(folders[0]?.id ?? "");
-  const [files, setFiles] = useState<File[]>([]);
-  const [step, setStep] = useState<1 | 2>(1);
+  const [uploads, setUploads] = useState<PendingImageUpload[]>([]);
+  const [step, setStep] = useState<1 | 2 | 3>(1);
   const [assignment, setAssignment] = useState<"new" | "existing">("existing");
   const [selectedOrderId, setSelectedOrderId] = useState("");
   const [uploading, setUploading] = useState(false);
@@ -54,28 +62,43 @@ export function UploadToFolderPage({
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
-    if (!clientId || !files.length || uploading) return;
+    if (!clientId || !uploads.length || uploading) return;
     if (step === 1) {
       setAssignment(recommendedOrder ? "existing" : "new");
       setSelectedOrderId(recommendedOrder?.id ?? "");
       setStep(2);
       return;
     }
+    if (step === 2) {
+      setStep(3);
+      return;
+    }
 
     setUploading(true);
     const success = assignment === "new"
-      ? await onCreateNew(clientId, files)
-      : await onUpload(clientId, files, effectiveOrderId);
+      ? await onCreateNew(clientId, uploads)
+      : await onUpload(clientId, uploads, effectiveOrderId);
     setUploading(false);
     if (success) onClose();
   }
 
+  function goBack() {
+    if (step === 3) setStep(2);
+    else if (step === 2) setStep(1);
+    else onClose();
+  }
+
   return (
     <section className={ui.pagePanel} aria-labelledby="upload-folder-title">
-      <button className={ui.backButton} type="button" onClick={onClose}><BackIcon /> Volver</button>
+      <button className={ui.backButton} type="button" onClick={goBack}>
+        <BackIcon />{step === 1 ? "Volver al dashboard" : "Volver al paso anterior"}
+      </button>
       <div className={ui.pageCard}>
         <div className={ui.pageHead}>
-          <div><p className={ui.eyebrow}>Paso {step} de 2</p><h2 id="upload-folder-title">{step === 1 ? "Subir imágenes" : "¿A qué pedido las asignamos?"}</h2></div>
+          <div>
+            <p className={ui.eyebrow}>Paso {step} de 3</p>
+            <h2 id="upload-folder-title">{step === 1 ? "Subir imágenes" : step === 2 ? "Describir imágenes" : "¿A qué pedido las asignamos?"}</h2>
+          </div>
         </div>
         <form onSubmit={submit}>
           {step === 1 ? (
@@ -87,14 +110,16 @@ export function UploadToFolderPage({
                 </select>
               </label>
               <div className={ui.uploadZone}>
-                <input ref={fileInput} type="file" accept="image/*" multiple hidden onChange={(event) => setFiles(Array.from(event.target.files ?? []))} />
+                <input ref={fileInput} type="file" accept="image/*" multiple hidden onChange={(event) => setUploads(createPendingImageUploads(Array.from(event.target.files ?? [])))} />
                 <UploadIcon />
-                <strong>{files.length ? `${files.length} imagen${files.length === 1 ? "" : "es"} lista${files.length === 1 ? "" : "s"}` : "Seleccioná las imágenes"}</strong>
-                <span>En el próximo paso vas a elegir el pedido de destino.</span>
+                <strong>{uploads.length ? `${uploads.length} imagen${uploads.length === 1 ? "" : "es"} lista${uploads.length === 1 ? "" : "s"}` : "Seleccioná las imágenes"}</strong>
+                <span>En el próximo paso podrás escribir una nota para cada imagen.</span>
                 <button type="button" className={ui.secondaryButton} onClick={() => fileInput.current?.click()}>Seleccionar archivos</button>
               </div>
-              {files.length > 0 && <div className={ui.fileSummary}>{files.map((file) => <span key={`${file.name}-${file.size}`}><ImageIcon />{file.name}</span>)}</div>}
+              {uploads.length > 0 && <SelectedImageThumbnails uploads={uploads} />}
             </>
+          ) : step === 2 ? (
+            <ImageDescriptionEditor onChange={setUploads} uploads={uploads} />
           ) : (
             <div className={ui.assignmentStep}>
               <button type="button" className={`${ui.assignmentCard} ${assignment === "new" ? ui.assignmentSelected : ""}`} onClick={() => setAssignment("new")}>
@@ -113,13 +138,12 @@ export function UploadToFolderPage({
                   </select>
                 </label>
               )}
-              <div className={ui.safetyNote}><span>✓</span><p><strong>Destino confirmado</strong>Las {files.length} imágenes quedarán vinculadas por ID y no se mezclarán con otros pedidos.</p></div>
+              <div className={ui.safetyNote}><span>✓</span><p><strong>Destino confirmado</strong>Las imágenes y sus descripciones quedarán vinculadas por ID al pedido elegido.</p></div>
             </div>
           )}
-          <div className={ui.formActions}>
-            <button type="button" className={ui.secondaryButton} onClick={() => step === 2 ? setStep(1) : onClose()}>{step === 2 ? "Atrás" : "Cancelar"}</button>
-            <button className={ui.primaryButton} disabled={!files.length || uploading || (step === 2 && assignment === "existing" && !effectiveOrderId)} type="submit">
-              {uploading ? "Guardando..." : step === 1 ? "Continuar" : assignment === "new" ? "Crear y asignar" : "Asignar imágenes"}
+          <div className="mt-5 flex justify-end">
+            <button className={ui.primaryButton} disabled={!uploads.length || uploading || (step === 3 && assignment === "existing" && !effectiveOrderId)} type="submit">
+              {uploading ? "Guardando..." : step !== 3 ? "Continuar" : assignment === "new" ? "Crear y asignar" : "Asignar imágenes"}
             </button>
           </div>
         </form>
