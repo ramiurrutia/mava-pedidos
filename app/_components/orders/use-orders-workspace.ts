@@ -1,10 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { createContext, createElement, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { sileo } from "sileo";
 import {
   findLatestPendingOrder,
   isOrderActive,
+  type ArtworkPreparationStatus,
   type ClientFolder,
   type Order,
   type OrderStatus,
@@ -17,6 +18,8 @@ import {
   loadWorkspace,
   updateRemoteOrderDetails,
   updateRemoteImageDescription,
+  updateRemoteCanvasesOrdered,
+  updateRemoteArtworkPreparation,
   updateRemoteOrderStatus,
   uploadRemoteImages,
   type OrderDetailsInput,
@@ -25,17 +28,20 @@ import {
 import type { DataSource } from "./shared";
 
 const LOCAL_STORAGE_KEYS = ["mava-orders", "mava-orders-v2"];
+const MAVA_SYNC_INTERVAL_MS = 60_000;
 
 type RefreshOptions = {
   notifyOnError?: boolean;
   showLoading?: boolean;
 };
 
-export function useOrdersWorkspace() {
+function useOrdersWorkspaceState() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [folders, setFolders] = useState<ClientFolder[]>([]);
   const [dataSource, setDataSource] = useState<DataSource>("loading");
   const refreshPromise = useRef<Promise<boolean> | null>(null);
+  const syncPromise = useRef<Promise<boolean> | null>(null);
+  const lastSyncAt = useRef(0);
 
   const refreshWorkspace = useCallback(({
     notifyOnError = false,
@@ -58,14 +64,6 @@ export function useOrdersWorkspace() {
       }
 
       try {
-        try {
-          await fetch("/api/integrations/mava-stock/sync", {
-            cache: "no-store",
-            method: "POST",
-          });
-        } catch {
-          // La sincronización externa no debe ocultar los pedidos ya guardados en MAVA.
-        }
         const workspace = await loadWorkspace();
         setFolders(workspace.folders);
         setOrders(workspace.orders);
@@ -90,14 +88,46 @@ export function useOrdersWorkspace() {
     return refresh;
   }, []);
 
-  useEffect(() => {
-    for (const key of LOCAL_STORAGE_KEYS) window.localStorage.removeItem(key);
-    void refreshWorkspace({ notifyOnError: true, showLoading: true });
+  const syncExternalOrders = useCallback(() => {
+    if (syncPromise.current) return syncPromise.current;
+    if (Date.now() - lastSyncAt.current < MAVA_SYNC_INTERVAL_MS) return Promise.resolve(false);
+
+    lastSyncAt.current = Date.now();
+    const sync = (async () => {
+      try {
+        const response = await fetch("/api/integrations/mava-stock/sync", {
+          cache: "no-store",
+          method: "POST",
+        });
+        if (!response.ok && response.status !== 207) return false;
+        await refreshWorkspace();
+        return true;
+      } catch {
+        // Los pedidos ya guardados siguen disponibles aunque falle el origen externo.
+        return false;
+      }
+    })();
+
+    syncPromise.current = sync;
+    void sync.finally(() => {
+      if (syncPromise.current === sync) syncPromise.current = null;
+    });
+    return sync;
   }, [refreshWorkspace]);
 
   useEffect(() => {
+    for (const key of LOCAL_STORAGE_KEYS) window.localStorage.removeItem(key);
+    void refreshWorkspace({ notifyOnError: true, showLoading: true })
+      .then((loaded) => {
+        if (loaded) void syncExternalOrders();
+      });
+  }, [refreshWorkspace, syncExternalOrders]);
+
+  useEffect(() => {
     const refreshOnReturn = () => {
-      if (document.visibilityState === "visible") void refreshWorkspace();
+      if (document.visibilityState === "visible") {
+        void refreshWorkspace().then(() => syncExternalOrders());
+      }
     };
 
     window.addEventListener("focus", refreshOnReturn);
@@ -106,7 +136,7 @@ export function useOrdersWorkspace() {
       window.removeEventListener("focus", refreshOnReturn);
       document.removeEventListener("visibilitychange", refreshOnReturn);
     };
-  }, [refreshWorkspace]);
+  }, [refreshWorkspace, syncExternalOrders]);
 
   function upsertOrder(order: Order) {
     setOrders((currentOrders) => [
@@ -134,14 +164,14 @@ export function useOrdersWorkspace() {
     }));
   }
 
-  async function createOrder(input: { clientName: string; notes: string; uploads: PendingImageUpload[] }) {
-    if (dataSource !== "supabase") return false;
+  async function createOrder(input: { clientName: string; notes: string; canvasesOrdered: boolean; uploads: PendingImageUpload[] }) {
+    if (dataSource !== "supabase") return null;
     const clientName = input.clientName.trim();
-    if (!clientName) return false;
+    if (!clientName) return null;
 
     let order: Order;
     try {
-      order = await createRemoteOrder(clientName, input.notes);
+      order = await createRemoteOrder(clientName, input.notes, input.canvasesOrdered);
       addFolderFromOrder(order);
       upsertOrder(order);
     } catch {
@@ -149,7 +179,7 @@ export function useOrdersWorkspace() {
         title: "Error al crear el pedido",
         description: `No se pudo crear el pedido de ${clientName}. Intenta nuevamente.`,
       });
-      return false;
+      return null;
     }
 
     if (!input.uploads.length) {
@@ -157,7 +187,7 @@ export function useOrdersWorkspace() {
         title: "Pedido creado",
         description: `${order.code} se guardó correctamente en ${order.clientName}.`,
       });
-      return true;
+      return order.id;
     }
 
     try {
@@ -176,28 +206,113 @@ export function useOrdersWorkspace() {
       });
     }
 
-    return true;
+    return order.id;
   }
 
   async function updateStatus(id: string, status: OrderStatus) {
     if (dataSource !== "supabase") return;
-    const previousStatus = orders.find((order) => order.id === id)?.status;
+    const previousOrder = orders.find((order) => order.id === id);
+    if (!previousOrder) return;
+    const completesOrder = status === "Terminado" || status === "Entregado";
     setOrders((currentOrders) => currentOrders.map((order) => (
-      order.id === id ? { ...order, status } : order
+      order.id === id ? {
+        ...order,
+        status,
+        canvasesOrdered: completesOrder ? true : order.canvasesOrdered,
+        images: completesOrder
+          ? order.images.map((image) => ({ ...image, preparationStatus: "Listo" }))
+          : order.images,
+        items: completesOrder
+          ? order.items?.map((item) => ({ ...item, preparationStatus: "Listo" }))
+          : order.items,
+      } : order
     )));
 
     try {
       await updateRemoteOrderStatus(id, status);
-    } catch {
-      if (previousStatus) {
-        setOrders((currentOrders) => currentOrders.map((order) => (
-          order.id === id ? { ...order, status: previousStatus } : order
-        )));
+      if (completesOrder) {
+        sileo.success({
+          title: "Pedido completado",
+          description: "Las telas quedaron pedidas y todos los cuadros se marcaron como listos.",
+        });
       }
+    } catch {
+      setOrders((currentOrders) => currentOrders.map((order) => (
+        order.id === id ? previousOrder : order
+      )));
       sileo.error({
         title: "No se pudo cambiar el estado",
-        description: "El pedido volvió a su estado anterior.",
+        description: "El pedido, las telas y los cuadros volvieron a su estado anterior.",
       });
+    }
+  }
+
+  async function updateCanvasesOrdered(id: string, canvasesOrdered: boolean) {
+    if (dataSource !== "supabase") return false;
+    const previousValue = orders.find((order) => order.id === id)?.canvasesOrdered ?? false;
+    setOrders((currentOrders) => currentOrders.map((order) => (
+      order.id === id ? { ...order, canvasesOrdered } : order
+    )));
+
+    try {
+      await updateRemoteCanvasesOrdered(id, canvasesOrdered);
+      sileo.success({
+        title: canvasesOrdered ? "Telas marcadas como pedidas" : "Telas marcadas como pendientes",
+        description: canvasesOrdered
+          ? "El pedido ya registra que las telas fueron solicitadas."
+          : "El pedido volvió a indicar que las telas todavía no se pidieron.",
+      });
+      return true;
+    } catch {
+      setOrders((currentOrders) => currentOrders.map((order) => (
+        order.id === id ? { ...order, canvasesOrdered: previousValue } : order
+      )));
+      sileo.error({
+        title: "No se pudo actualizar el check",
+        description: "El valor anterior se mantuvo. Intenta nuevamente.",
+      });
+      return false;
+    }
+  }
+
+  async function updateArtworkPreparation(
+    orderId: string,
+    artworkKey: string,
+    status: ArtworkPreparationStatus,
+  ) {
+    if (dataSource !== "supabase") return false;
+    const targetOrder = orders.find((order) => order.id === orderId);
+    const previousStatus = targetOrder?.images.find((image) => image.preparationKey === artworkKey)?.preparationStatus
+      ?? targetOrder?.items?.find((item) => item.preparationKey === artworkKey)?.preparationStatus
+      ?? "Pendiente";
+
+    function applyStatus(currentOrders: Order[], nextStatus: ArtworkPreparationStatus) {
+      return currentOrders.map((order) => order.id !== orderId ? order : ({
+        ...order,
+        images: order.images.map((image) => image.preparationKey === artworkKey
+          ? { ...image, preparationStatus: nextStatus }
+          : image),
+        items: order.items?.map((item) => item.preparationKey === artworkKey
+          ? { ...item, preparationStatus: nextStatus }
+          : item),
+      }));
+    }
+
+    setOrders((currentOrders) => applyStatus(currentOrders, status));
+    try {
+      await updateRemoteArtworkPreparation(orderId, artworkKey, status);
+      sileo.success({
+        title: "Preparación actualizada",
+        description: `El cuadro quedó marcado como ${status.toLocaleLowerCase("es")}.`,
+      });
+      return true;
+    } catch {
+      setOrders((currentOrders) => applyStatus(currentOrders, previousStatus));
+      sileo.error({
+        title: "No se pudo cambiar la preparación",
+        description: "El estado anterior se mantuvo. Intenta nuevamente.",
+      });
+      return false;
     }
   }
 
@@ -362,6 +477,8 @@ export function useOrdersWorkspace() {
     retryConnection: () => refreshWorkspace({ notifyOnError: true, showLoading: true }),
     createOrder,
     updateStatus,
+    updateCanvasesOrdered,
+    updateArtworkPreparation,
     updateOrderDetails,
     updateImageDescription,
     deleteOrder,
@@ -416,7 +533,20 @@ function uploadSummary(uploadedCount: number, totalFiles: number, failedFiles: U
   return `Se subieron ${uploadedCount} de ${totalFiles}. Fallaron: ${failedNames}.`;
 }
 
-export type OrdersWorkspace = ReturnType<typeof useOrdersWorkspace>;
+export type OrdersWorkspace = ReturnType<typeof useOrdersWorkspaceState>;
+
+const OrdersWorkspaceContext = createContext<OrdersWorkspace | null>(null);
+
+export function OrdersWorkspaceProvider({ children }: { children: ReactNode }) {
+  const workspace = useOrdersWorkspaceState();
+  return createElement(OrdersWorkspaceContext.Provider, { value: workspace }, children);
+}
+
+export function useOrdersWorkspace() {
+  const workspace = useContext(OrdersWorkspaceContext);
+  if (!workspace) throw new Error("useOrdersWorkspace debe usarse dentro de OrdersWorkspaceProvider.");
+  return workspace;
+}
 
 function foldersFromOrders(orders: Order[]) {
   return [...new Map(orders.map((order) => [

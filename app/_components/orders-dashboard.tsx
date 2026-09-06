@@ -7,8 +7,9 @@ import {
   isMavaStockOrder,
   MAVA_STOCK_FOLDER_ID,
   MAVA_STOCK_SOURCE,
+  type OrderStatus,
 } from "../../lib/orders";
-import { AppShell } from "./orders/app-shell";
+import { AppShell, type NavigationMemoryAction } from "./orders/app-shell";
 import { CreateOrderPage } from "./orders/create-order-page";
 import { FolderPage } from "./orders/folder-page";
 import { OrderPage } from "./orders/order-page";
@@ -21,9 +22,11 @@ import { WorkspacePage } from "./orders/workspace-page";
 export function OrdersDashboard({
   view = "resumen",
   entityId,
+  initialStatus,
 }: {
   view?: DashboardView;
   entityId?: string;
+  initialStatus?: OrderStatus;
 }) {
   const router = useRouter();
   const workspace = useOrdersWorkspace();
@@ -36,16 +39,29 @@ export function OrdersDashboard({
       ? { id: MAVA_STOCK_FOLDER_ID, name: MAVA_STOCK_SOURCE }
       : workspace.folders.find((folder) => folder.id === entityId)
     : undefined;
+  const navigationMemoryAction: NavigationMemoryAction = (
+    (view === "pedido" || view === "carpeta") && workspace.dataSource !== "supabase"
+      ? "ignore"
+      : (view === "pedido" && !routeOrder) || (view === "carpeta" && !routeFolder)
+        ? "reset"
+        : "remember"
+  );
 
   return (
-    <AppShell activeView={activeView}>
-      <Toaster position="top-right" />
+    <AppShell activeView={activeView} memoryAction={navigationMemoryAction}>
+      <Toaster
+        offset={{ top: "calc(env(safe-area-inset-top) + 8px)" }}
+        options={{ fill: "#111311", roundness: 18 }}
+        position="top-center"
+        theme="light"
+      />
       {workspace.dataSource === "error" ? (
         <ConnectionErrorPage onRetry={workspace.retryConnection} />
       ) : isWorkspaceView(view) ? (
         <WorkspacePage
           dataSource={workspace.dataSource}
           folders={workspace.folders}
+          initialStatus={initialStatus}
           orders={workspace.orders}
           view={view}
         />
@@ -57,6 +73,7 @@ export function OrdersDashboard({
           onAssignExisting={workspace.uploadImagesToFolder}
           onClose={() => router.back()}
           onCreate={workspace.createOrder}
+          onOpenOrder={(orderId) => router.replace(`/pedidos/${encodeURIComponent(orderId)}`)}
           orders={workspace.orders}
         />
       ) : view === "subir" ? (
@@ -70,7 +87,7 @@ export function OrdersDashboard({
       ) : view === "pedido" && routeOrder ? (
         <OrderPage
           onAddImages={(uploads) => workspace.uploadImagesToFolder(routeOrder.clientId, uploads, routeOrder.id)}
-          onClose={() => router.back()}
+          onClose={() => router.replace("/pedidos")}
           onDelete={async () => {
             const deleted = await workspace.deleteOrder(routeOrder.id);
             if (deleted) router.replace("/pedidos");
@@ -78,13 +95,15 @@ export function OrdersDashboard({
           }}
           onEdit={(details) => workspace.updateOrderDetails(routeOrder.id, details)}
           onEditImageDescription={(imageId, description) => workspace.updateImageDescription(routeOrder.id, imageId, description)}
+          onCanvasesOrderedChange={(value) => workspace.updateCanvasesOrdered(routeOrder.id, value)}
+          onArtworkPreparationChange={(artworkKey, status) => workspace.updateArtworkPreparation(routeOrder.id, artworkKey, status)}
           onStatusChange={(status) => workspace.updateStatus(routeOrder.id, status)}
           order={routeOrder}
         />
       ) : view === "carpeta" && routeFolder ? (
         <FolderPage
           folder={routeFolder}
-          onClose={() => router.back()}
+          onClose={() => router.replace("/carpetas")}
           orders={workspace.orders
             .filter((order) => routeFolder.id === MAVA_STOCK_FOLDER_ID
               ? isMavaStockOrder(order)
@@ -92,7 +111,7 @@ export function OrdersDashboard({
             .sort((left, right) => Date.parse(right.createdAt) - Date.parse(left.createdAt))}
         />
       ) : (
-        <ResourceNotFound onClose={() => router.back()} />
+        <ResourceNotFound onClose={() => router.replace(activeView === "carpetas" ? "/carpetas" : activeView === "pedidos" ? "/pedidos" : "/")} />
       )}
     </AppShell>
   );

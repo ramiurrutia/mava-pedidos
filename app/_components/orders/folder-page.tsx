@@ -1,5 +1,6 @@
 import Link from "next/link";
 import {
+  getOrderArtworkProgress,
   isOrderActive,
   MAVA_STOCK_FOLDER_ID,
   type ClientFolder,
@@ -29,7 +30,7 @@ export function FolderPage({
         <div className={ui.folderSummary}>
           <span><strong>{orders.length}</strong>Pedidos</span>
           <span><strong>{orders.filter((order) => isOrderActive(order.status)).length}</strong>Activos</span>
-          <span><strong>{orders.reduce((total, order) => total + order.images.length, 0)}</strong>Imágenes</span>
+          <span><strong>{orders.reduce((total, order) => total + getOrderArtworkProgress(order).total, 0)}</strong>Cuadros</span>
         </div>
         <div className={ui.folderOrderList}>
           {orders.map((order) => (
@@ -37,7 +38,7 @@ export function FolderPage({
               <span className={ui.orderCover} style={{ background: order.cover }}><ImageIcon /></span>
               <span className={ui.folderOrderCopy}>
                 <strong>{order.code}</strong>
-                <small>{isSourceGroup ? `${order.clientName} · ` : order.sourceSystem ? `${order.sourceSystem} · ` : ""}{order.images.length} imagen{order.images.length === 1 ? "" : "es"} · {formatDate(order.createdAt)}</small>
+                <small>{isSourceGroup ? `${order.clientName} · ` : order.sourceSystem ? `${order.sourceSystem} · ` : ""}{order.canvasesOrdered ? "✓ Telas pedidas" : "⚠ Telas sin pedir"} · {formatArtworkProgress(order)} · {formatDate(order.createdAt)}</small>
               </span>
               <span className={`${ui.statusPill} ${statusStyles[order.status]}`}><i />{order.status}</span>
               <ArrowIcon />
@@ -48,4 +49,9 @@ export function FolderPage({
       </div>
     </section>
   );
+}
+
+function formatArtworkProgress(order: Order) {
+  const { ready, total } = getOrderArtworkProgress(order);
+  return total ? `${ready} de ${total} listos` : "Sin cuadros";
 }

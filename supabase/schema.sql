@@ -12,6 +12,7 @@ create type public.order_status as enum (
 
 create type public.image_source as enum ('web', 'whatsapp');
 create type public.upload_status as enum ('pending', 'ready', 'failed');
+create type public.artwork_preparation_status as enum ('pending', 'ready');
 
 create table public.order_code_sequences (
   prefix text primary key,
@@ -40,6 +41,7 @@ create table public.orders (
     check (length(trim(client_name)) between 1 and 80),
   status public.order_status not null default 'pending',
   notes text not null default '',
+  canvases_ordered boolean not null default false,
   source_system text,
   source_order_id text,
   source_status text,
@@ -90,6 +92,15 @@ create table public.order_status_history (
   changed_by uuid references auth.users(id),
   comment text,
   changed_at timestamptz not null default now()
+);
+
+create table public.order_artwork_preparations (
+  order_id uuid not null references public.orders(id) on delete cascade,
+  artwork_key text not null constraint order_artwork_preparations_key_check
+    check (length(artwork_key) between 3 and 200 and artwork_key ~ '^(image|stock):'),
+  status public.artwork_preparation_status not null default 'pending',
+  updated_at timestamptz not null default now(),
+  primary key (order_id, artwork_key)
 );
 
 create table public.push_subscriptions (
@@ -255,6 +266,45 @@ begin
 end;
 $$;
 
+create or replace function public.complete_terminal_order()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if new.deleted_at is null and new.status in ('finished', 'delivered') then
+    if not new.canvases_ordered then
+      update public.orders
+      set canvases_ordered = true
+      where id = new.id;
+    end if;
+
+    insert into public.order_artwork_preparations (order_id, artwork_key, status)
+    select new.id, 'image:' || order_images.id::text, 'ready'
+    from public.order_images
+    where order_images.order_id = new.id
+      and order_images.upload_status = 'ready'
+    on conflict (order_id, artwork_key) do update
+    set status = 'ready', updated_at = now();
+
+    insert into public.order_artwork_preparations (order_id, artwork_key, status)
+    select
+      new.id,
+      'stock:' || (artwork.item ->> 'id') || ':' || (artwork.position - 1)::text,
+      'ready'
+    from jsonb_array_elements(coalesce(new.items, '[]'::jsonb))
+      with ordinality as artwork(item, position)
+    where nullif(artwork.item ->> 'id', '') is not null
+      and length('stock:' || (artwork.item ->> 'id') || ':' || (artwork.position - 1)::text) <= 200
+    on conflict (order_id, artwork_key) do update
+    set status = 'ready', updated_at = now();
+  end if;
+
+  return new;
+end;
+$$;
+
 create trigger orders_apply_update_metadata
 before update on public.orders
 for each row execute function public.apply_order_update_metadata();
@@ -262,6 +312,14 @@ for each row execute function public.apply_order_update_metadata();
 create trigger orders_record_status_change
 after update of status on public.orders
 for each row execute function public.record_order_status_change();
+
+create trigger orders_complete_terminal_insert
+after insert on public.orders
+for each row execute function public.complete_terminal_order();
+
+create trigger orders_complete_terminal_status
+after update of status on public.orders
+for each row execute function public.complete_terminal_order();
 
 create or replace function public.assign_generic_order_code()
 returns trigger
@@ -302,7 +360,8 @@ for each row execute function public.assign_generic_order_code();
 create or replace function public.create_order(
   requested_prefix text,
   requested_client_name text,
-  requested_notes text default ''
+  requested_notes text default '',
+  requested_canvases_ordered boolean default false
 ) returns public.orders
 language plpgsql
 security definer
@@ -353,13 +412,14 @@ begin
     generated_code := base_code || '-' || lpad(code_suffix::text, 2, '0');
   end loop;
 
-  insert into public.orders (code, code_number, client_id, client_name, notes, created_by)
+  insert into public.orders (code, code_number, client_id, client_name, notes, canvases_ordered, created_by)
   values (
     generated_code,
     sequence_number,
     requested_client_id,
     stored_client_name,
     coalesce(requested_notes, ''),
+    coalesce(requested_canvases_ordered, false),
     null
   )
   returning * into created_order;
@@ -796,6 +856,36 @@ begin
 end;
 $$;
 
+create or replace function public.set_artwork_preparation_status(
+  requested_order_id uuid,
+  requested_artwork_key text,
+  requested_status public.artwork_preparation_status
+) returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if nullif(trim(requested_artwork_key), '') is null
+    or length(trim(requested_artwork_key)) > 200
+    or trim(requested_artwork_key) !~ '^(image|stock):' then
+    raise exception 'INVALID_ARTWORK_KEY';
+  end if;
+
+  if not exists (
+    select 1 from public.orders
+    where id = requested_order_id and deleted_at is null
+  ) then
+    raise exception 'ORDER_NOT_FOUND';
+  end if;
+
+  insert into public.order_artwork_preparations (order_id, artwork_key, status)
+  values (requested_order_id, trim(requested_artwork_key), requested_status)
+  on conflict (order_id, artwork_key) do update
+  set status = excluded.status, updated_at = now();
+end;
+$$;
+
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values (
   'order-images',
@@ -812,6 +902,7 @@ on conflict (id) do update set
 alter table public.client_folders enable row level security;
 alter table public.orders enable row level security;
 alter table public.order_images enable row level security;
+alter table public.order_artwork_preparations enable row level security;
 alter table public.order_status_history enable row level security;
 alter table public.order_code_sequences enable row level security;
 alter table public.push_subscriptions enable row level security;
@@ -828,6 +919,9 @@ on public.orders for update to anon, authenticated using (true) with check (true
 
 create policy "internal app reads images"
 on public.order_images for select to anon, authenticated using (true);
+
+create policy "internal app reads artwork preparation"
+on public.order_artwork_preparations for select to anon, authenticated using (true);
 
 create policy "internal app reads status history"
 on public.order_status_history for select to anon, authenticated using (true);
@@ -852,12 +946,13 @@ with check (
   )
 );
 
-revoke all on function public.create_order(text, text, text) from public;
+revoke all on function public.create_order(text, text, text, boolean) from public;
 revoke all on function public.import_external_order(text, text, text, text, text, jsonb, text, text, numeric, timestamptz, text) from public;
 revoke all on function public.update_order_details(uuid, text, text, text, text) from public;
 revoke all on function public.soft_delete_order(uuid) from public;
 revoke all on function public.prepare_order_image(uuid, uuid, uuid, text, text, bigint, text) from public;
 revoke all on function public.update_order_image_description(uuid, text) from public;
+revoke all on function public.set_artwork_preparation_status(uuid, text, public.artwork_preparation_status) from public;
 revoke all on function public.complete_order_image(uuid) from public;
 revoke all on function public.fail_order_image(uuid) from public;
 revoke all on function public.claim_pending_order_notifications(uuid[]) from public;
@@ -865,6 +960,7 @@ revoke all on function public.enqueue_new_order_notification() from public;
 revoke all on function public.preserve_locally_edited_order_details() from public;
 revoke all on function public.reject_images_for_deleted_orders() from public;
 revoke all on function public.assign_generic_order_code() from public;
+revoke all on function public.complete_terminal_order() from public;
 
 revoke all on public.push_subscriptions from anon, authenticated;
 revoke all on public.push_notification_events from anon, authenticated;
@@ -872,14 +968,16 @@ revoke all on public.push_notification_events from anon, authenticated;
 grant select on public.client_folders to anon, authenticated;
 grant select, update on public.orders to anon, authenticated;
 grant select on public.order_images to anon, authenticated;
+grant select on public.order_artwork_preparations to anon, authenticated;
 grant select, insert on public.order_status_history to anon, authenticated;
 
-grant execute on function public.create_order(text, text, text) to anon, authenticated;
+grant execute on function public.create_order(text, text, text, boolean) to anon, authenticated;
 grant execute on function public.import_external_order(text, text, text, text, text, jsonb, text, text, numeric, timestamptz, text) to service_role;
 grant execute on function public.update_order_details(uuid, text, text, text, text) to anon, authenticated;
 grant execute on function public.soft_delete_order(uuid) to anon, authenticated;
 grant execute on function public.prepare_order_image(uuid, uuid, uuid, text, text, bigint, text) to anon, authenticated;
 grant execute on function public.update_order_image_description(uuid, text) to anon, authenticated;
+grant execute on function public.set_artwork_preparation_status(uuid, text, public.artwork_preparation_status) to anon, authenticated;
 grant execute on function public.complete_order_image(uuid) to anon, authenticated;
 grant execute on function public.fail_order_image(uuid) to anon, authenticated;
 grant execute on function public.claim_pending_order_notifications(uuid[]) to service_role;

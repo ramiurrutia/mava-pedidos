@@ -9,7 +9,7 @@ import {
   type Order,
   type PendingImageUpload,
 } from "../../../lib/orders";
-import { BackIcon, UploadIcon } from "../icons";
+import { BackIcon, SpinnerIcon, UploadIcon } from "../icons";
 import { ui } from "./shared";
 import { ImageDescriptionEditor } from "./image-description-editor";
 import { SelectedImageThumbnails } from "./local-image-preview";
@@ -143,6 +143,7 @@ export function UploadToFolderPage({
           )}
           <div className="mt-5 flex justify-end">
             <button className={ui.primaryButton} disabled={!uploads.length || uploading || (step === 3 && assignment === "existing" && !effectiveOrderId)} type="submit">
+              {uploading && <SpinnerIcon className="animate-spin" />}
               {uploading ? "Guardando..." : step !== 3 ? "Continuar" : assignment === "new" ? "Crear y asignar" : "Asignar imágenes"}
             </button>
           </div>

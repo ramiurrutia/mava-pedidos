@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { sileo } from "sileo";
-import { BellIcon, BellOffIcon } from "./icons";
+import { BellIcon, BellOffIcon, SpinnerIcon } from "./icons";
 
 type PushState =
   | "checking"
@@ -119,7 +119,9 @@ export function PushNotificationsButton() {
       title={enabled ? "Notificaciones activadas" : "Activar notificaciones"}
       type="button"
     >
-      {isUnavailableState(state) ? <BellOffIcon /> : <BellIcon />}
+      {state === "checking" || state === "saving"
+        ? <SpinnerIcon className="animate-spin" />
+        : isUnavailableState(state) ? <BellOffIcon /> : <BellIcon />}
       <span className="max-[680px]:sr-only">{enabled ? "Activadas" : "Notificaciones"}</span>
     </button>
   );

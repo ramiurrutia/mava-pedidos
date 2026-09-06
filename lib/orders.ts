@@ -1,4 +1,5 @@
 export type OrderStatus = "Pendiente" | "En producción" | "Terminado" | "Entregado";
+export type ArtworkPreparationStatus = "Pendiente" | "Listo";
 
 export type ClientFolder = {
   id: string;
@@ -10,6 +11,8 @@ export type OrderImage = {
   pedidoId: string;
   name: string;
   description: string;
+  preparationKey: string;
+  preparationStatus: ArtworkPreparationStatus;
   addedAt: string;
   previewUrl?: string;
 };
@@ -31,6 +34,9 @@ export type OrderItem = {
   price: number;
   background?: string;
   backgroundLabel?: string;
+  imageUrl?: string;
+  preparationKey?: string;
+  preparationStatus?: ArtworkPreparationStatus;
 };
 
 export type Order = {
@@ -40,6 +46,7 @@ export type Order = {
   clientName: string;
   status: OrderStatus;
   notes: string;
+  canvasesOrdered: boolean;
   createdAt: string;
   images: OrderImage[];
   cover: string;
@@ -67,4 +74,18 @@ export function findLatestPendingOrder(orders: Order[], clientId: string) {
 
 export function isOrderActive(status: OrderStatus) {
   return status === "Pendiente" || status === "En producción";
+}
+
+export function getOrderArtworkProgress(order: Order) {
+  const artworks = [
+    ...order.images.map((image) => image.preparationStatus),
+    ...(order.items ?? []).map((item) => item.preparationStatus ?? "Pendiente"),
+  ];
+  const total = artworks.length;
+  const ready = artworks.filter((status) => status === "Listo").length;
+  return {
+    ready,
+    total,
+    percentage: total ? Math.round((ready / total) * 100) : 0,
+  };
 }

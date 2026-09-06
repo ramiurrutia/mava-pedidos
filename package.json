@@ -9,13 +9,15 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@base-ui/react": "^1.8.0",
     "@supabase/supabase-js": "^2.111.0",
     "next": "16.2.12",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "react-icons": "^5.7.0",
     "sileo": "^0.1.5",
-    "web-push": "^3.6.7"
+    "web-push": "^3.6.7",
+    "yet-another-react-lightbox": "^3.32.2"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

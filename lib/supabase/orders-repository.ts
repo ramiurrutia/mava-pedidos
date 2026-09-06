@@ -1,5 +1,6 @@
 import {
   type ClientFolder,
+  type ArtworkPreparationStatus,
   type Order,
   type OrderImage,
   type OrderItem,
@@ -29,6 +30,7 @@ type OrderRow = {
   client_name: string;
   status: DatabaseStatus;
   notes: string;
+  canvases_ordered: boolean;
   created_at: string;
   source_system?: string | null;
   source_order_id?: string | null;
@@ -38,6 +40,12 @@ type OrderRow = {
   items?: OrderItem[] | null;
   total?: number | null;
   order_images?: ImageRow[] | null;
+  order_artwork_preparations?: PreparationRow[] | null;
+};
+
+type PreparationRow = {
+  artwork_key: string;
+  status: DatabasePreparationStatus;
 };
 
 type PreparedImageRow = {
@@ -48,6 +56,8 @@ type PreparedImageRow = {
   description: string;
   created_at: string;
 };
+
+type DatabasePreparationStatus = "pending" | "in_preparation" | "ready";
 
 export type UploadFailure = {
   fileName: string;
@@ -75,6 +85,17 @@ const toDatabaseStatus: Record<OrderStatus, DatabaseStatus> = {
   Entregado: "delivered",
 };
 
+const fromDatabasePreparationStatus: Record<DatabasePreparationStatus, ArtworkPreparationStatus> = {
+  pending: "Pendiente",
+  in_preparation: "Pendiente",
+  ready: "Listo",
+};
+
+const toDatabasePreparationStatus: Record<ArtworkPreparationStatus, DatabasePreparationStatus> = {
+  Pendiente: "pending",
+  Listo: "ready",
+};
+
 const covers = [
   "linear-gradient(145deg, #d9c1a5, #725649)",
   "linear-gradient(145deg, #96b3b2, #314d52)",
@@ -88,19 +109,16 @@ function normalizeRpcRow<T>(value: T | T[] | null): T {
   return row;
 }
 
-async function createSignedImage(image: ImageRow | PreparedImageRow): Promise<OrderImage> {
-  const supabase = createClient();
-  const { data, error } = await supabase.storage
-    .from(IMAGE_BUCKET)
-    .createSignedUrl(image.storage_key, 60 * 60);
-
+function createSignedImage(image: ImageRow | PreparedImageRow, previewUrl?: string): OrderImage {
   return {
     id: image.id,
     pedidoId: image.order_id,
     name: image.original_filename,
     description: image.description,
+    preparationKey: `image:${image.id}`,
+    preparationStatus: "Pendiente",
     addedAt: image.created_at,
-    previewUrl: error ? undefined : data.signedUrl,
+    previewUrl,
   };
 }
 
@@ -117,6 +135,7 @@ export async function loadWorkspace(): Promise<{ folders: ClientFolder[]; orders
         client_name,
         status,
         notes,
+        canvases_ordered,
         created_at,
         source_system,
         source_order_id,
@@ -133,6 +152,10 @@ export async function loadWorkspace(): Promise<{ folders: ClientFolder[]; orders
           description,
           created_at,
           upload_status
+        ),
+        order_artwork_preparations (
+          artwork_key,
+          status
         )
       `)
       .is("deleted_at", null)
@@ -143,10 +166,28 @@ export async function loadWorkspace(): Promise<{ folders: ClientFolder[]; orders
   if (ordersResult.error) throw ordersResult.error;
 
   const rows = ordersResult.data as OrderRow[];
+  const readyImageRows = rows.flatMap((row) => (row.order_images ?? [])
+    .filter((image) => image.upload_status === "ready"));
+  const { data: signedImages } = readyImageRows.length
+    ? await supabase.storage
+      .from(IMAGE_BUCKET)
+      .createSignedUrls(readyImageRows.map((image) => image.storage_key), 60 * 60)
+    : { data: [] };
+  const signedUrlByPath = new Map(
+    (signedImages ?? [])
+      .filter((image) => image.path && image.signedUrl)
+      .map((image) => [image.path, image.signedUrl!]),
+  );
   const visibleFolderIds = new Set(rows.map((row) => row.client_id));
   const folders = (foldersResult.data as ClientFolder[])
     .filter((folder) => visibleFolderIds.has(folder.id));
-  const orders = await Promise.all(rows.map(async (row, index): Promise<Order> => {
+  const orders = rows.map((row, index): Order => {
+    const preparationByKey = new Map(
+      (row.order_artwork_preparations ?? []).map((preparation) => [
+        preparation.artwork_key,
+        fromDatabasePreparationStatus[preparation.status],
+      ]),
+    );
     const readyImages = (row.order_images ?? [])
       .filter((image) => image.upload_status === "ready")
       .sort((left, right) => Date.parse(right.created_at) - Date.parse(left.created_at));
@@ -157,29 +198,41 @@ export async function loadWorkspace(): Promise<{ folders: ClientFolder[]; orders
       clientName: row.client_name,
       status: fromDatabaseStatus[row.status],
       notes: row.notes,
+      canvasesOrdered: row.canvases_ordered,
       createdAt: row.created_at,
-      images: await Promise.all(readyImages.map(createSignedImage)),
+      images: readyImages.map((imageRow) => ({
+        ...createSignedImage(imageRow, signedUrlByPath.get(imageRow.storage_key)),
+        preparationStatus: preparationByKey.get(`image:${imageRow.id}`) ?? "Pendiente",
+      })),
       cover: covers[index % covers.length],
       sourceSystem: row.source_system ?? undefined,
       sourceOrderId: row.source_order_id ?? undefined,
       sourceStatus: row.source_status ?? undefined,
       contactName: row.contact_name ?? undefined,
       whatsapp: row.whatsapp ?? undefined,
-      items: row.items ?? [],
+      items: (row.items ?? []).map((item, itemIndex) => {
+        const preparationKey = `stock:${item.id}:${itemIndex}`;
+        return {
+          ...item,
+          preparationKey,
+          preparationStatus: preparationByKey.get(preparationKey) ?? "Pendiente",
+        };
+      }),
       total: row.total ?? undefined,
     };
-  }));
+  });
 
   return { folders, orders };
 }
 
-export async function createRemoteOrder(clientName: string, notes: string): Promise<Order> {
+export async function createRemoteOrder(clientName: string, notes: string, canvasesOrdered = false): Promise<Order> {
   const supabase = createClient();
   const { data, error } = await supabase.rpc("create_order", {
     // La clave conserva la secuencia histórica; Supabase publica el código como PEDIDO-DDMMAAAA-HHMM.
     requested_prefix: "CLASH",
     requested_client_name: clientName,
     requested_notes: notes,
+    requested_canvases_ordered: canvasesOrdered,
   });
 
   if (error) throw error;
@@ -191,6 +244,7 @@ export async function createRemoteOrder(clientName: string, notes: string): Prom
     clientName: row.client_name,
     status: fromDatabaseStatus[row.status],
     notes: row.notes,
+    canvasesOrdered: row.canvases_ordered,
     createdAt: row.created_at,
     images: [],
     cover: covers[0],
@@ -214,6 +268,31 @@ export async function updateRemoteOrderStatus(orderId: string, status: OrderStat
     .eq("id", orderId)
     .is("deleted_at", null);
 
+  if (error) throw error;
+}
+
+export async function updateRemoteCanvasesOrdered(orderId: string, canvasesOrdered: boolean) {
+  const supabase = createClient();
+  const { error } = await supabase
+    .from("orders")
+    .update({ canvases_ordered: canvasesOrdered })
+    .eq("id", orderId)
+    .is("deleted_at", null);
+
+  if (error) throw error;
+}
+
+export async function updateRemoteArtworkPreparation(
+  orderId: string,
+  artworkKey: string,
+  status: ArtworkPreparationStatus,
+) {
+  const supabase = createClient();
+  const { error } = await supabase.rpc("set_artwork_preparation_status", {
+    requested_order_id: orderId,
+    requested_artwork_key: artworkKey,
+    requested_status: toDatabasePreparationStatus[status],
+  });
   if (error) throw error;
 }
 

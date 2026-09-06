@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { PwaRegister } from "./_components/pwa-register";
+import { OrdersWorkspaceProvider } from "./_components/orders/use-orders-workspace";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -56,7 +57,7 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="flex min-h-full flex-col bg-[#f7f7f5] font-sans text-[#202825]">
-        {children}
+        <OrdersWorkspaceProvider>{children}</OrdersWorkspaceProvider>
         <PwaRegister />
       </body>
     </html>

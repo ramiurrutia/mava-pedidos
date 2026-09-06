@@ -15,4 +15,6 @@ export {
   FiTrash2 as TrashIcon,
   FiSave as SaveIcon,
   FiX as CloseIcon,
+  FiCheck as CheckIcon,
+  FiLoader as SpinnerIcon,
 } from "react-icons/fi";

@@ -8,7 +8,7 @@ import {
   type Order,
   type PendingImageUpload,
 } from "../../../lib/orders";
-import { BackIcon, UploadIcon } from "../icons";
+import { BackIcon, CheckIcon, SpinnerIcon, UploadIcon } from "../icons";
 import { ui } from "./shared";
 import { ImageDescriptionEditor } from "./image-description-editor";
 import { SelectedImageThumbnails } from "./local-image-preview";
@@ -19,15 +19,18 @@ export function CreateOrderPage({
   onClose,
   onCreate,
   onAssignExisting,
+  onOpenOrder,
 }: {
   folders: ClientFolder[];
   orders: Order[];
   onClose: () => void;
-  onCreate: (input: { clientName: string; notes: string; uploads: PendingImageUpload[] }) => Promise<boolean>;
+  onCreate: (input: { clientName: string; notes: string; canvasesOrdered: boolean; uploads: PendingImageUpload[] }) => Promise<string | null>;
   onAssignExisting: (clientId: string, uploads: PendingImageUpload[], orderId?: string) => Promise<boolean>;
+  onOpenOrder: (orderId: string) => void;
 }) {
   const [clientName, setClientName] = useState("");
   const [notes, setNotes] = useState("");
+  const [canvasesOrdered, setCanvasesOrdered] = useState(false);
   const [uploads, setUploads] = useState<PendingImageUpload[]>([]);
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [assignment, setAssignment] = useState<"new" | "existing">("new");
@@ -66,13 +69,15 @@ export function CreateOrderPage({
     }
 
     setSaving(true);
-    const success = assignment === "new"
-      ? await onCreate({ clientName: normalizedClientName, notes: notes.trim(), uploads })
-      : uploads.length && effectiveOrderId && matchingFolder
-        ? await onAssignExisting(matchingFolder.id, uploads, effectiveOrderId)
-        : false;
+    let destinationOrderId: string | null = null;
+    if (assignment === "new") {
+      destinationOrderId = await onCreate({ clientName: normalizedClientName, notes: notes.trim(), canvasesOrdered, uploads });
+    } else if (uploads.length && effectiveOrderId && matchingFolder) {
+      const assigned = await onAssignExisting(matchingFolder.id, uploads, effectiveOrderId);
+      if (assigned) destinationOrderId = effectiveOrderId;
+    }
     setSaving(false);
-    if (success) onClose();
+    if (destinationOrderId) onOpenOrder(destinationOrderId);
   }
 
   function goBack() {
@@ -85,7 +90,7 @@ export function CreateOrderPage({
     ? "Crear pedido"
     : step === 2
       ? "Describir imágenes"
-      : "Asignar imágenes";
+      : uploads.length ? "Asignar imágenes" : "Confirmar pedido";
 
   return (
     <section className={ui.pagePanel} aria-labelledby="new-order-title">
@@ -100,10 +105,12 @@ export function CreateOrderPage({
           {step === 1 ? (
             <FirstStep
               clientName={clientName}
+              canvasesOrdered={canvasesOrdered}
               fileInput={fileInput}
               folders={folders}
               notes={notes}
               onClientNameChange={setClientName}
+              onCanvasesOrderedChange={setCanvasesOrdered}
               onFilesChange={(files) => setUploads(createPendingImageUploads(files))}
               onNotesChange={setNotes}
               uploads={uploads}
@@ -113,6 +120,7 @@ export function CreateOrderPage({
           ) : (
             <AssignmentStep
               assignment={assignment}
+              canvasesOrdered={canvasesOrdered}
               clientName={clientName.trim()}
               effectiveOrderId={effectiveOrderId}
               folderExists={Boolean(matchingFolder)}
@@ -125,6 +133,7 @@ export function CreateOrderPage({
           )}
           <div className="mt-5 flex justify-end">
             <button className={ui.primaryButton} disabled={saving || (step === 3 && assignment === "existing" && (!uploads.length || !effectiveOrderId))} type="submit">
+              {saving && <SpinnerIcon className="animate-spin" />}
               {saving ? "Guardando..." : step !== 3 ? "Continuar" : assignment === "new" ? "Crear pedido" : "Asignar imágenes"}
             </button>
           </div>
@@ -136,20 +145,24 @@ export function CreateOrderPage({
 
 function FirstStep({
   clientName,
+  canvasesOrdered,
   uploads,
   fileInput,
   folders,
   notes,
   onClientNameChange,
+  onCanvasesOrderedChange,
   onFilesChange,
   onNotesChange,
 }: {
   clientName: string;
+  canvasesOrdered: boolean;
   uploads: PendingImageUpload[];
   fileInput: React.RefObject<HTMLInputElement | null>;
   folders: ClientFolder[];
   notes: string;
   onClientNameChange: (value: string) => void;
+  onCanvasesOrderedChange: (value: boolean) => void;
   onFilesChange: (files: File[]) => void;
   onNotesChange: (value: string) => void;
 }) {
@@ -162,6 +175,28 @@ function FirstStep({
         <span>Notas generales del pedido</span>
         <textarea value={notes} onChange={(event) => onNotesChange(event.target.value)} placeholder="Fecha de entrega u otras indicaciones generales..." rows={3} />
       </label>
+      <fieldset className="mb-4 rounded-xl border border-[#dfe3df] bg-[#fafbf9] p-4">
+        <legend className="px-1 text-xs font-semibold text-[#34413c]">¿Ya se pidieron las telas?</legend>
+        <p className="mb-3 mt-1 text-[10px] leading-relaxed text-[#75807b]">Podrás cambiar esta respuesta después desde el pedido.</p>
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            aria-pressed={!canvasesOrdered}
+            className={`${!canvasesOrdered ? "border-[#8ca397] bg-[#edf3ef] text-[#235c4c]" : "border-[#dfe3df] bg-white text-[#69736e]"} min-h-10 rounded-lg border px-4 text-xs font-semibold transition-colors`}
+            onClick={() => onCanvasesOrderedChange(false)}
+            type="button"
+          >
+            No, todavía no
+          </button>
+          <button
+            aria-pressed={canvasesOrdered}
+            className={`${canvasesOrdered ? "border-[#78a08b] bg-[#e4f0e8] text-[#235c4c]" : "border-[#dfe3df] bg-white text-[#69736e]"} inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border px-4 text-xs font-semibold transition-colors`}
+            onClick={() => onCanvasesOrderedChange(true)}
+            type="button"
+          >
+            {canvasesOrdered && <CheckIcon />} Sí, ya están pedidas
+          </button>
+        </div>
+      </fieldset>
       <div className={ui.uploadZone}>
         <input ref={fileInput} type="file" accept="image/*" multiple hidden onChange={(event) => onFilesChange(Array.from(event.target.files ?? []))} />
         <UploadIcon />
@@ -284,6 +319,7 @@ function ClientFolderInput({
 
 function AssignmentStep({
   assignment,
+  canvasesOrdered,
   clientName,
   effectiveOrderId,
   folderExists,
@@ -294,6 +330,7 @@ function AssignmentStep({
   uploadCount,
 }: {
   assignment: "new" | "existing";
+  canvasesOrdered: boolean;
   clientName: string;
   effectiveOrderId: string;
   folderExists: boolean;
@@ -321,6 +358,19 @@ function AssignmentStep({
           </select>
         </label>
       )}
+      <div className="rounded-xl border border-[#dfe5e1] bg-[#f8faf8] p-4">
+        <strong className="block text-xs font-semibold text-[#29352f]">Resumen antes de guardar</strong>
+        <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-xs">
+          <dt className="text-[#77817c]">Cliente</dt>
+          <dd className="truncate text-right font-semibold">{clientName}</dd>
+          <dt className="text-[#77817c]">Telas</dt>
+          <dd className="text-right font-semibold">{canvasesOrdered ? "Pedidas" : "Sin pedir"}</dd>
+          <dt className="text-[#77817c]">Imágenes</dt>
+          <dd className="text-right font-semibold">{uploadCount}</dd>
+          <dt className="text-[#77817c]">Destino</dt>
+          <dd className="truncate text-right font-semibold">{assignment === "new" ? "Pedido nuevo" : pendingOrders.find((order) => order.id === effectiveOrderId)?.code ?? "Pedido activo"}</dd>
+        </dl>
+      </div>
       <div className={ui.safetyNote}><span>✓</span><p><strong>Confirmación manual</strong>Cada imagen y su descripción quedarán vinculadas al pedido elegido mediante su ID.</p></div>
     </div>
   );
