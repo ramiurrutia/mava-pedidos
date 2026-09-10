@@ -1,14 +1,16 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import {
   createPendingImageUploads,
+  getOrderFolderId,
   isOrderActive,
   type ClientFolder,
   type Order,
   type PendingImageUpload,
 } from "../../../lib/orders";
-import { BackIcon, CheckIcon, SpinnerIcon, UploadIcon } from "../icons";
+import { BackIcon, CheckIcon, FileIcon, SpinnerIcon, UploadIcon } from "../icons";
 import { ui } from "./shared";
 import { ImageDescriptionEditor } from "./image-description-editor";
 import { SelectedImageThumbnails } from "./local-image-preview";
@@ -24,12 +26,13 @@ export function CreateOrderPage({
   folders: ClientFolder[];
   orders: Order[];
   onClose: () => void;
-  onCreate: (input: { clientName: string; notes: string; canvasesOrdered: boolean; uploads: PendingImageUpload[] }) => Promise<string | null>;
+  onCreate: (input: { clientName: string; locality: string; notes: string; canvasesOrdered: boolean; uploads: PendingImageUpload[] }) => Promise<string | null>;
   onAssignExisting: (clientId: string, uploads: PendingImageUpload[], orderId?: string) => Promise<boolean>;
   onOpenOrder: (orderId: string) => void;
 }) {
   const [clientName, setClientName] = useState("");
   const [notes, setNotes] = useState("");
+  const [locality, setLocality] = useState("");
   const [canvasesOrdered, setCanvasesOrdered] = useState(false);
   const [uploads, setUploads] = useState<PendingImageUpload[]>([]);
   const [step, setStep] = useState<1 | 2 | 3>(1);
@@ -44,7 +47,7 @@ export function CreateOrderPage({
   );
   const pendingOrders = useMemo(
     () => orders
-      .filter((order) => order.clientId === matchingFolder?.id && isOrderActive(order.status))
+      .filter((order) => getOrderFolderId(order) === matchingFolder?.id && isOrderActive(order.status))
       .sort((left, right) => Date.parse(right.createdAt) - Date.parse(left.createdAt)),
     [matchingFolder?.id, orders],
   );
@@ -71,7 +74,7 @@ export function CreateOrderPage({
     setSaving(true);
     let destinationOrderId: string | null = null;
     if (assignment === "new") {
-      destinationOrderId = await onCreate({ clientName: normalizedClientName, notes: notes.trim(), canvasesOrdered, uploads });
+      destinationOrderId = await onCreate({ clientName: normalizedClientName, locality: locality.trim(), notes: notes.trim(), canvasesOrdered, uploads });
     } else if (uploads.length && effectiveOrderId && matchingFolder) {
       const assigned = await onAssignExisting(matchingFolder.id, uploads, effectiveOrderId);
       if (assigned) destinationOrderId = effectiveOrderId;
@@ -102,8 +105,11 @@ export function CreateOrderPage({
           <div><p className={ui.eyebrow}>Nuevo pedido · Paso {displayedStep} de {totalSteps}</p><h2 id="new-order-title">{title}</h2></div>
         </div>
         <form onSubmit={submit}>
+          {step === 1 && <Link href="/pedidos/importar" className="mb-5 flex items-center gap-3 rounded-xl border border-[#cbdcd1] bg-[#f0f6f1] p-4 text-inherit no-underline transition-colors hover:bg-[#e6f0e8] focus-visible:outline-2 focus-visible:outline-[#235c4c]"><FileIcon className="size-5 shrink-0 text-[#235c4c]" /><span><strong className="block text-sm font-semibold">¿Tenés el pedido en PDF?</strong><small className="mt-1 block text-xs text-[#68726d]">Importar datos, cantidades y fotos con vista previa</small></span></Link>}
           {step === 1 ? (
             <FirstStep
+              locality={locality}
+              onLocalityChange={setLocality}
               clientName={clientName}
               canvasesOrdered={canvasesOrdered}
               fileInput={fileInput}
@@ -144,6 +150,8 @@ export function CreateOrderPage({
 }
 
 function FirstStep({
+  locality,
+  onLocalityChange,
   clientName,
   canvasesOrdered,
   uploads,
@@ -163,6 +171,8 @@ function FirstStep({
   notes: string;
   onClientNameChange: (value: string) => void;
   onCanvasesOrderedChange: (value: boolean) => void;
+  locality: string;
+  onLocalityChange: (value: string) => void;
   onFilesChange: (files: File[]) => void;
   onNotesChange: (value: string) => void;
 }) {
@@ -171,6 +181,10 @@ function FirstStep({
       <div className={ui.field}>
         <ClientFolderInput folders={folders} onChange={onClientNameChange} value={clientName} />
       </div>
+      <label className={ui.field}>
+        <span>Localidad (opcional)</span>
+        <input autoComplete="address-level2" maxLength={120} value={locality} onChange={(event) => onLocalityChange(event.target.value)} placeholder="Ej. Mar del Plata" />
+      </label>
       <label className={ui.field}>
         <span>Notas generales del pedido</span>
         <textarea value={notes} onChange={(event) => onNotesChange(event.target.value)} placeholder="Fecha de entrega u otras indicaciones generales..." rows={3} />
@@ -303,7 +317,7 @@ function ClientFolderInput({
                 role="option"
                 type="button"
               >
-                <span className="truncate">{folder.name}</span>
+                <span className="truncate">{folder.name.toLocaleUpperCase("es")}</span>
                 <small className="ml-3 shrink-0 text-[9px] font-normal text-[#89928e]">Carpeta existente</small>
               </button>
             ))}
@@ -311,7 +325,7 @@ function ClientFolderInput({
         )}
       </div>
       <small className={`${exactFolder ? "text-[#3f765f]" : "text-[#7b8580]"} text-[10px] leading-relaxed`}>
-        {exactFolder ? `Se usará la carpeta existente “${exactFolder.name}”.` : "Si el cliente todavía no existe, su carpeta se creará junto con el pedido."}
+        {exactFolder ? `Se usará la carpeta existente “${exactFolder.name.toLocaleUpperCase("es")}”.` : "Si el cliente todavía no existe, su carpeta se creará junto con el pedido."}
       </small>
     </>
   );
@@ -344,7 +358,7 @@ function AssignmentStep({
     <div className={ui.assignmentStep}>
       <button type="button" className={`${ui.assignmentCard} ${assignment === "new" ? ui.assignmentSelected : ""}`} onClick={() => onAssignmentChange("new")}>
         <span className={`${ui.assignmentRadio} ${assignment === "new" ? ui.assignmentRadioSelected : ""}`} />
-        <span><strong>Asignar a pedido nuevo</strong><small>{folderExists ? `Crear un pedido dentro de ${clientName}.` : `Crear el pedido y la carpeta ${clientName}.`} Se generará un código como PEDIDO-01072026-1220.</small></span>
+        <span><strong>Asignar a pedido nuevo</strong><small>{folderExists ? `Crear un pedido dentro de ${clientName.toLocaleUpperCase("es")}.` : `Crear el pedido y la carpeta ${clientName.toLocaleUpperCase("es")}.`} Se generará un código como PEDIDO-01072026-1220.</small></span>
       </button>
       <button type="button" disabled={!recommendedOrder || !uploadCount} className={`${ui.assignmentCard} ${assignment === "existing" ? ui.assignmentSelected : ""}`} onClick={() => recommendedOrder && uploadCount && onAssignmentChange("existing")}>
         <span className={`${ui.assignmentRadio} ${assignment === "existing" ? ui.assignmentRadioSelected : ""}`} />

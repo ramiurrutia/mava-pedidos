@@ -4,6 +4,7 @@ export {
   FiGrid as GridIcon,
   FiPackage as BoxIcon,
   FiImage as ImageIcon,
+  FiFileText as FileIcon,
   FiFolder as FolderIcon,
   FiMoreHorizontal as MoreIcon,
   FiChevronRight as ArrowIcon,

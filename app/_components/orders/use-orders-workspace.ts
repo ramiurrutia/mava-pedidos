@@ -4,6 +4,9 @@ import { createContext, createElement, useCallback, useContext, useEffect, useRe
 import { sileo } from "sileo";
 import {
   findLatestPendingOrder,
+  getOrderFolderId,
+  isMavaStockOrder,
+  MAVA_STOCK_FOLDER_ID,
   isOrderActive,
   type ArtworkPreparationStatus,
   type ClientFolder,
@@ -14,6 +17,7 @@ import {
 import { isSupabaseConfigured } from "../../../lib/supabase/client";
 import {
   createRemoteOrder,
+  moveRemoteOrder,
   deleteRemoteOrder,
   loadWorkspace,
   updateRemoteOrderDetails,
@@ -42,6 +46,36 @@ function useOrdersWorkspaceState() {
   const refreshPromise = useRef<Promise<boolean> | null>(null);
   const syncPromise = useRef<Promise<boolean> | null>(null);
   const lastSyncAt = useRef(0);
+  const movingOrders = useRef(new Set<string>());
+
+  async function moveOrder(orderId: string, folderId: string) {
+    if (dataSource !== "supabase" || movingOrders.current.has(orderId)) return false;
+    const order = orders.find((candidate) => candidate.id === orderId);
+    const folder = folders.find((candidate) => candidate.id === folderId);
+    const toStock = folderId === MAVA_STOCK_FOLDER_ID;
+    if (!order || (!folder && !toStock)) return false;
+    if (toStock && !isMavaStockOrder(order)) {
+      sileo.warning({ title: "Esta carpeta es de MAVA STOCK", description: "Solo los pedidos importados de stock pueden volver a ella." });
+      return false;
+    }
+    if (getOrderFolderId(order) === folderId) return true;
+    movingOrders.current.add(orderId);
+    try {
+      await moveRemoteOrder(orderId, toStock ? null : folderId);
+      setOrders((current) => current.map((candidate) => candidate.id === orderId ? {
+        ...candidate,
+        folderId: toStock ? undefined : folderId,
+        folderName: toStock ? undefined : folder?.name,
+      } : candidate));
+      sileo.success({ title: "Pedido movido", description: `${order.code} ahora está en ${toStock ? "MAVA STOCK" : folder?.name}.` });
+      return true;
+    } catch {
+      sileo.error({ title: "No se pudo mover el pedido", description: "El pedido sigue en su carpeta original. Intenta nuevamente." });
+      return false;
+    } finally {
+      movingOrders.current.delete(orderId);
+    }
+  }
 
   const refreshWorkspace = useCallback(({
     notifyOnError = false,
@@ -164,14 +198,14 @@ function useOrdersWorkspaceState() {
     }));
   }
 
-  async function createOrder(input: { clientName: string; notes: string; canvasesOrdered: boolean; uploads: PendingImageUpload[] }) {
+  async function createOrder(input: { clientName: string; locality: string; notes: string; canvasesOrdered: boolean; uploads: PendingImageUpload[] }) {
     if (dataSource !== "supabase") return null;
     const clientName = input.clientName.trim();
     if (!clientName) return null;
 
     let order: Order;
     try {
-      order = await createRemoteOrder(clientName, input.notes, input.canvasesOrdered);
+      order = await createRemoteOrder(clientName, input.notes, input.canvasesOrdered, input.locality);
       addFolderFromOrder(order);
       upsertOrder(order);
     } catch {
@@ -402,7 +436,7 @@ function useOrdersWorkspaceState() {
     const targetOrder = requestedOrderId
       ? orders.find((order) => (
           order.id === requestedOrderId
-          && order.clientId === clientId
+          && (order.clientId === clientId || getOrderFolderId(order) === clientId)
           && isOrderActive(order.status)
         ))
       : findLatestPendingOrder(orders, clientId);
@@ -416,7 +450,7 @@ function useOrdersWorkspaceState() {
 
     try {
       const upload = await uploadRemoteImages({
-        clientId,
+        clientId: targetOrder.clientId,
         orderId: targetOrder.id,
         uploads,
       });
@@ -475,7 +509,9 @@ function useOrdersWorkspaceState() {
     folders,
     dataSource,
     retryConnection: () => refreshWorkspace({ notifyOnError: true, showLoading: true }),
+    refreshOrders: refreshWorkspace,
     createOrder,
+    moveOrder,
     updateStatus,
     updateCanvasesOrdered,
     updateArtworkPreparation,
@@ -549,8 +585,10 @@ export function useOrdersWorkspace() {
 }
 
 function foldersFromOrders(orders: Order[]) {
-  return [...new Map(orders.map((order) => [
-    order.clientId,
+  const folders = orders.flatMap((order) => [
     { id: order.clientId, name: order.clientName },
-  ])).values()].sort((left, right) => left.name.localeCompare(right.name, "es"));
+    ...(order.folderId && order.folderName ? [{ id: order.folderId, name: order.folderName }] : []),
+  ]);
+  return [...new Map(folders.map((folder) => [folder.id, folder])).values()]
+    .sort((left, right) => left.name.localeCompare(right.name, "es"));
 }

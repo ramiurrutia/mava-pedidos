@@ -1,6 +1,9 @@
 "use client";
 
+import { OrderNotes } from "./order-notes";
+
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   createPendingImageUploads,
   getOrderArtworkProgress,
@@ -16,6 +19,7 @@ import { BackIcon, CheckIcon, EditIcon, ImageIcon, MoreIcon, SpinnerIcon, TrashI
 import { ArtworkLightbox, type ArtworkViewerEntry } from "./artwork-lightbox";
 import { ImageDescriptionEditor } from "./image-description-editor";
 import { OrderEditModal } from "./order-edit-modal";
+import { OrderPdfAttachment } from "./order-pdf-attachment";
 import { formatCurrency, statuses, statusStyles, ui } from "./shared";
 
 export function OrderPage({
@@ -43,6 +47,7 @@ export function OrderPage({
   const [pendingUploads, setPendingUploads] = useState<PendingImageUpload[]>([]);
   const [uploading, setUploading] = useState(false);
   const [editing, setEditing] = useState(false);
+  const searchParams = useSearchParams();
   const [savingCanvasesOrdered, setSavingCanvasesOrdered] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -68,6 +73,23 @@ export function OrderPage({
     }
     setViewerIndex(null);
   }, [viewerIndex]);
+
+  useEffect(() => {
+    if (searchParams.get("editar") !== "1") return;
+    const frame = requestAnimationFrame(() => {
+      const url = new URL(window.location.href);
+      if (url.searchParams.get("editar") !== "1") return;
+      // Consume the action so restoring the tab never reopens the editor.
+      // The extra entry lets system Back close editing and stay on this order.
+      url.searchParams.delete("editar");
+      const cleanUrl = `${url.pathname}${url.search}${url.hash}`;
+      window.history.replaceState(window.history.state, "", cleanUrl);
+      window.history.pushState({ ...window.history.state, mavaEditOrder: order.id }, "", cleanUrl);
+      setConfirmingDelete(false);
+      setEditing(true);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [order.id, searchParams]);
 
   useEffect(() => {
     function closeOverlayFromHistory() {
@@ -259,14 +281,16 @@ export function OrderPage({
               </div>
             </div>
           )}
-          <div className={`${ui.safetyNote} order-7 -mt-2`}><span>✓</span><p><strong>Destino confirmado</strong>Las imágenes se vinculan a {order.code} mediante su ID.</p></div>
-          {(order.sourceSystem || order.contactName || order.whatsapp) && (
+          <div className={`${ui.safetyNote} order-7 -mt-2`}><span>✓</span><p><strong>Vinculado</strong>Las imágenes se vinculan a {order.code} mediante su ID.</p></div>
+          {(order.sourceSystem || order.contactName || order.whatsapp || order.locality) && (
             <div className="order-9 grid grid-cols-2 gap-3 rounded-lg border border-[#e4e7e3] bg-[#fafbf9] p-3 max-[480px]:grid-cols-1">
               <div className={ui.detailBlock}><span>Contacto</span><p>{order.contactName || "Sin nombre de contacto"}</p></div>
               <div className={ui.detailBlock}><span>WhatsApp</span><p>{order.whatsapp || "Sin número registrado"}</p></div>
+              <div className={ui.detailBlock}><span>Localidad</span><p>{order.locality || "Sin localidad registrada"}</p></div>
             </div>
           )}
-          <div className={`${ui.detailBlock} order-10`}><span>Notas</span><p>{order.notes || "Sin notas para este pedido."}</p></div>
+            <OrderNotes notes={order.notes} fromPdf={order.sourceSystem === "PDF"} />
+            {order.sourceSystem === "PDF" && <OrderPdfAttachment orderId={order.id} complete={order.sourceStatus === "pdf_complete"} />}
           {(order.items?.length ?? 0) > 0 && (
             <div className={`${ui.detailBlock} order-4`}>
               <div className={ui.detailTitle}>

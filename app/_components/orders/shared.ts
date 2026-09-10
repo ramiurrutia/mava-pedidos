@@ -1,6 +1,6 @@
 import type { OrderStatus } from "../../../lib/orders";
 
-export type DashboardView = "resumen" | "pedidos" | "carpetas" | "nuevo" | "subir" | "pedido" | "carpeta";
+export type DashboardView = "resumen" | "pedidos" | "carpetas" | "nuevo" | "subir" | "pedido" | "carpeta" | "importar-pdf";
 export type WorkspaceView = Extract<DashboardView, "resumen" | "pedidos" | "carpetas">;
 export type DataSource = "loading" | "supabase" | "error";
 
@@ -42,12 +42,12 @@ export const ui = {
   searchBox: "flex h-10 w-[min(340px,48%)] items-center gap-2.5 rounded-lg border border-[#dfe3df] bg-white px-3 focus-within:border-[#94aa9f] focus-within:ring-2 focus-within:ring-[#e8efeb] [&_svg]:size-4 [&_svg]:shrink-0 [&_svg]:text-[#8a938f] max-[680px]:w-full",
   searchInput: "min-w-0 flex-1 border-0 bg-transparent text-[13px] text-[#202825] outline-none placeholder:text-[#929b96]",
   orderList: "overflow-hidden rounded-xl border border-[#e4e6e3] bg-white",
-  tableGrid: "grid grid-cols-[minmax(220px,2fr)_minmax(130px,1fr)_90px_100px_20px] items-center gap-x-4",
+  tableGrid: "grid grid-cols-[minmax(180px,2fr)_minmax(130px,1fr)_76px_88px_44px] items-center gap-x-3",
   listHead: "min-h-10 border-b border-[#e7e9e6] bg-[#fafbf9] px-4 text-[9px] font-semibold uppercase tracking-[.08em] text-[#929a96] max-[760px]:hidden",
   orderRow: "min-h-[70px] w-full cursor-pointer border-b border-[#eceeeb] bg-white px-4 text-left transition-colors last:border-b-0 hover:bg-[#fafbf9] focus-visible:relative focus-visible:z-10 focus-visible:outline-2 focus-visible:outline-[#235c4c] max-[760px]:grid-cols-[1fr_auto] max-[760px]:grid-rows-2 max-[760px]:gap-y-2 max-[760px]:p-3.5",
   orderIdentity: "flex min-w-0 items-center gap-3 max-[760px]:[grid-area:1/1] [&_strong]:block [&_strong]:truncate [&_strong]:text-[13px] [&_strong]:font-semibold [&_small]:mt-1 [&_small]:block [&_small]:truncate [&_small]:text-[11px] [&_small]:text-[#737e78]",
   orderCover: "grid size-10 shrink-0 place-items-center rounded-lg text-white/80 [&_svg]:size-[17px]",
-  folderCover: "bg-[#dfe9e2] text-[#173d34]",
+  folderCover: "bg-[#dfe9e2] !text-[#173d34]",
   statusPill: "inline-flex min-h-7 w-max items-center gap-1.5 rounded-full px-2.5 py-1.5 text-[10px] font-semibold [&_i]:size-1.5 [&_i]:rounded-full [&_i]:bg-current",
   statusCell: "max-[760px]:[grid-area:2/1]",
   imageCount: "flex items-center gap-1.5 text-[11px] text-[#68726d] [&_svg]:size-3.5 max-[760px]:[grid-area:2/2] max-[760px]:justify-self-end",

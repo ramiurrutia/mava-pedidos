@@ -12,6 +12,7 @@
 
 # testing
 /coverage
+/public/pdfjs/
 
 # next.js
 /.next/

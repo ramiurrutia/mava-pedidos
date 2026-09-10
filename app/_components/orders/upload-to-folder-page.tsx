@@ -4,12 +4,13 @@ import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   createPendingImageUploads,
+  getOrderFolderId,
   isOrderActive,
   type ClientFolder,
   type Order,
   type PendingImageUpload,
 } from "../../../lib/orders";
-import { BackIcon, SpinnerIcon, UploadIcon } from "../icons";
+import { BackIcon, FileIcon, SpinnerIcon, UploadIcon } from "../icons";
 import { ui } from "./shared";
 import { ImageDescriptionEditor } from "./image-description-editor";
 import { SelectedImageThumbnails } from "./local-image-preview";
@@ -37,7 +38,7 @@ export function UploadToFolderPage({
 
   const pendingOrders = useMemo(
     () => orders
-      .filter((order) => order.clientId === clientId && isOrderActive(order.status))
+      .filter((order) => getOrderFolderId(order) === clientId && isOrderActive(order.status))
       .sort((left, right) => Date.parse(right.createdAt) - Date.parse(left.createdAt)),
     [clientId, orders],
   );
@@ -54,6 +55,7 @@ export function UploadToFolderPage({
             <strong id="upload-folder-title">Todavía no hay carpetas</strong>
             <span>Creá el primer pedido y su carpeta aparecerá automáticamente.</span>
             <Link className={`${ui.primaryButton} mt-2 no-underline`} href="/pedidos/nuevo">Crear primer pedido</Link>
+            <Link className={`${ui.secondaryButton} no-underline`} href="/pedidos/importar"><FileIcon />Importar pedido desde PDF</Link>
           </div>
         </div>
       </section>
@@ -101,12 +103,13 @@ export function UploadToFolderPage({
           </div>
         </div>
         <form onSubmit={submit}>
+          {step === 1 && <Link href="/pedidos/importar" className="mb-4 flex min-h-12 items-center gap-2 rounded-xl bg-[#edf4ee] px-3 text-xs font-semibold text-[#235c4c] no-underline"><FileIcon />¿Es un PDF? Importar como pedido nuevo</Link>}
           {step === 1 ? (
             <>
               <label className={ui.field}>
                 <span>Cliente / carpeta</span>
                 <select value={clientId} onChange={(event) => setClientId(event.target.value)}>
-                  {folders.map((folder) => <option value={folder.id} key={folder.id}>{folder.name}</option>)}
+                  {folders.map((folder) => <option value={folder.id} key={folder.id}>{folder.name.toLocaleUpperCase("es")}</option>)}
                 </select>
               </label>
               <div className={ui.uploadZone}>

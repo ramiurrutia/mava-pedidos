@@ -93,7 +93,7 @@ function isRestorableRoute(view: WorkspaceView, route: string) {
   if (!route.startsWith("/") || route.includes("//")) return false;
   if (view === "resumen") return route === "/";
   if (view === "carpetas") return route === "/carpetas" || /^\/carpetas\/[^/]+$/.test(route);
-  return route === "/pedidos" || (/^\/pedidos\/[^/]+$/.test(route) && route !== "/pedidos/nuevo");
+  return route === "/pedidos" || (/^\/pedidos\/[^/]+$/.test(route) && route !== "/pedidos/nuevo" && route !== "/pedidos/importar");
 }
 
 function subscribeToNavigationMemory(listener: () => void) {

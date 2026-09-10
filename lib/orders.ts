@@ -44,6 +44,8 @@ export type Order = {
   code: string;
   clientId: string;
   clientName: string;
+  folderId?: string;
+  folderName?: string;
   status: OrderStatus;
   notes: string;
   canvasesOrdered: boolean;
@@ -55,6 +57,7 @@ export type Order = {
   sourceStatus?: string;
   contactName?: string;
   whatsapp?: string;
+  locality?: string;
   items?: OrderItem[];
   total?: number;
 };
@@ -66,9 +69,13 @@ export function isMavaStockOrder(order: Order) {
   return order.sourceSystem === MAVA_STOCK_SOURCE;
 }
 
+export function getOrderFolderId(order: Order) {
+  return order.folderId ?? (isMavaStockOrder(order) ? MAVA_STOCK_FOLDER_ID : order.clientId);
+}
+
 export function findLatestPendingOrder(orders: Order[], clientId: string) {
   return orders
-    .filter((order) => order.clientId === clientId && isOrderActive(order.status))
+    .filter((order) => getOrderFolderId(order) === clientId && isOrderActive(order.status))
     .sort((left, right) => Date.parse(right.createdAt) - Date.parse(left.createdAt))[0];
 }
 

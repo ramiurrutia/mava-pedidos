@@ -28,6 +28,7 @@ type OrderRow = {
   code: string;
   client_id: string;
   client_name: string;
+  organization_folder_id?: string | null;
   status: DatabaseStatus;
   notes: string;
   canvases_ordered: boolean;
@@ -37,6 +38,7 @@ type OrderRow = {
   source_status?: string | null;
   contact_name?: string | null;
   whatsapp?: string | null;
+  locality?: string | null;
   items?: OrderItem[] | null;
   total?: number | null;
   order_images?: ImageRow[] | null;
@@ -69,6 +71,7 @@ export type OrderDetailsInput = {
   notes: string;
   contactName: string;
   whatsapp: string;
+  locality: string;
 };
 
 const fromDatabaseStatus: Record<DatabaseStatus, OrderStatus> = {
@@ -133,6 +136,7 @@ export async function loadWorkspace(): Promise<{ folders: ClientFolder[]; orders
         code,
         client_id,
         client_name,
+        organization_folder_id,
         status,
         notes,
         canvases_ordered,
@@ -142,6 +146,7 @@ export async function loadWorkspace(): Promise<{ folders: ClientFolder[]; orders
         source_status,
         contact_name,
         whatsapp,
+        locality,
         items,
         total,
         order_images (
@@ -178,7 +183,7 @@ export async function loadWorkspace(): Promise<{ folders: ClientFolder[]; orders
       .filter((image) => image.path && image.signedUrl)
       .map((image) => [image.path, image.signedUrl!]),
   );
-  const visibleFolderIds = new Set(rows.map((row) => row.client_id));
+  const visibleFolderIds = new Set(rows.flatMap((row) => [row.client_id, row.organization_folder_id]));
   const folders = (foldersResult.data as ClientFolder[])
     .filter((folder) => visibleFolderIds.has(folder.id));
   const orders = rows.map((row, index): Order => {
@@ -196,6 +201,8 @@ export async function loadWorkspace(): Promise<{ folders: ClientFolder[]; orders
       code: row.code,
       clientId: row.client_id,
       clientName: row.client_name,
+      folderId: row.organization_folder_id ?? undefined,
+      folderName: folders.find((folder) => folder.id === row.organization_folder_id)?.name,
       status: fromDatabaseStatus[row.status],
       notes: row.notes,
       canvasesOrdered: row.canvases_ordered,
@@ -210,6 +217,7 @@ export async function loadWorkspace(): Promise<{ folders: ClientFolder[]; orders
       sourceStatus: row.source_status ?? undefined,
       contactName: row.contact_name ?? undefined,
       whatsapp: row.whatsapp ?? undefined,
+      locality: row.locality ?? undefined,
       items: (row.items ?? []).map((item, itemIndex) => {
         const preparationKey = `stock:${item.id}:${itemIndex}`;
         return {
@@ -225,11 +233,12 @@ export async function loadWorkspace(): Promise<{ folders: ClientFolder[]; orders
   return { folders, orders };
 }
 
-export async function createRemoteOrder(clientName: string, notes: string, canvasesOrdered = false): Promise<Order> {
+export async function createRemoteOrder(clientName: string, notes: string, canvasesOrdered = false, locality = ""): Promise<Order> {
   const supabase = createClient();
-  const { data, error } = await supabase.rpc("create_order", {
+  const { data, error } = await supabase.rpc("create_order_with_locality", {
     // La clave conserva la secuencia histórica; Supabase publica el código como PEDIDO-DDMMAAAA-HHMM.
     requested_prefix: "CLASH",
+    requested_locality: locality.trim(),
     requested_client_name: clientName,
     requested_notes: notes,
     requested_canvases_ordered: canvasesOrdered,
@@ -247,6 +256,7 @@ export async function createRemoteOrder(clientName: string, notes: string, canva
     canvasesOrdered: row.canvases_ordered,
     createdAt: row.created_at,
     images: [],
+    locality: row.locality ?? undefined,
     cover: covers[0],
   };
   try {
@@ -269,6 +279,15 @@ export async function updateRemoteOrderStatus(orderId: string, status: OrderStat
     .is("deleted_at", null);
 
   if (error) throw error;
+}
+
+export async function moveRemoteOrder(orderId: string, folderId: string | null) {
+  const { data, error } = await createClient().rpc("move_order_to_folder", {
+    requested_order_id: orderId,
+    requested_folder_id: folderId,
+  });
+  if (error) throw error;
+  if (data !== true) throw new Error("ORDER_NOT_FOUND");
 }
 
 export async function updateRemoteCanvasesOrdered(orderId: string, canvasesOrdered: boolean) {
@@ -298,12 +317,13 @@ export async function updateRemoteArtworkPreparation(
 
 export async function updateRemoteOrderDetails(orderId: string, input: OrderDetailsInput) {
   const supabase = createClient();
-  const { data, error } = await supabase.rpc("update_order_details", {
+  const { data, error } = await supabase.rpc("update_order_details_with_locality", {
     requested_order_id: orderId,
     requested_client_name: input.clientName,
     requested_notes: input.notes,
     requested_contact_name: input.contactName || null,
     requested_whatsapp: input.whatsapp || null,
+    requested_locality: input.locality.trim(),
   });
   if (error) throw error;
 
@@ -314,6 +334,7 @@ export async function updateRemoteOrderDetails(orderId: string, input: OrderDeta
     notes: row.notes,
     contactName: row.contact_name ?? undefined,
     whatsapp: row.whatsapp ?? undefined,
+      locality: row.locality ?? undefined,
   };
 }
 

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   getOrderArtworkProgress,
+  getOrderFolderId,
   isMavaStockOrder,
   isOrderActive,
   MAVA_STOCK_FOLDER_ID,
@@ -28,6 +29,8 @@ import {
   type DataSource,
   type WorkspaceView,
 } from "./shared";
+import { FolderDropRow, FolderDropTargets } from "./order-folder-actions";
+import { OrderListRow, orderListGrid } from "./order-list-row";
 
 export function WorkspacePage({
   view,
@@ -79,7 +82,7 @@ export function WorkspacePage({
   const globalFolderResults = useMemo(() => {
     const normalized = normalizeSearch(query);
     if (!normalized) return [];
-    const results = folders.filter((folder) => matchesSearch(`${folder.id} ${folder.name}`, normalized));
+    const results = folders.filter((folder) => matchesSearch(`${folder.id} ${folder.name.toLocaleUpperCase("es")}`, normalized));
     if (orders.some(isMavaStockOrder) && matchesSearch(`${MAVA_STOCK_SOURCE} mava stock origen sincronizados`, normalized)) {
       return [{ id: MAVA_STOCK_FOLDER_ID, name: MAVA_STOCK_SOURCE }, ...results];
     }
@@ -91,14 +94,15 @@ export function WorkspacePage({
       .map((folder) => {
       const allFolderOrders = orders.filter((order) => order.clientId === folder.id);
       const folderOrders = filteredOrders
-        .filter((order) => order.clientId === folder.id && !isMavaStockOrder(order))
+        .filter((order) => getOrderFolderId(order) === folder.id)
         .sort((left, right) => Date.parse(right.createdAt) - Date.parse(left.createdAt));
       return {
         ...folder,
-        hiddenSourceFolder: allFolderOrders.length > 0 && allFolderOrders.every(isMavaStockOrder),
+        hiddenSourceFolder: !orders.some((order) => getOrderFolderId(order) === folder.id)
+          && allFolderOrders.length > 0 && allFolderOrders.every(isMavaStockOrder),
         orderCount: folderOrders.length,
         pendingCount: folderOrders.filter((order) => isOrderActive(order.status)).length,
-        imageCount: folderOrders.reduce((total, order) => total + order.images.length, 0),
+        imageCount: folderOrders.reduce((total, order) => total + getOrderArtworkProgress(order).total, 0),
         latestAt: folderOrders[0]?.createdAt,
       };
     })
@@ -107,7 +111,7 @@ export function WorkspacePage({
       ));
 
     const mavaOrders = filteredOrders
-      .filter(isMavaStockOrder)
+      .filter((order) => getOrderFolderId(order) === MAVA_STOCK_FOLDER_ID)
       .sort((left, right) => Date.parse(right.createdAt) - Date.parse(left.createdAt));
     const hasMavaOrders = orders.some(isMavaStockOrder);
     const showMavaFolder = mavaOrders.length > 0
@@ -117,7 +121,7 @@ export function WorkspacePage({
       name: MAVA_STOCK_SOURCE,
       orderCount: mavaOrders.length,
       pendingCount: mavaOrders.filter((order) => isOrderActive(order.status)).length,
-      imageCount: mavaOrders.reduce((total, order) => total + order.images.length, 0),
+      imageCount: mavaOrders.reduce((total, order) => total + getOrderArtworkProgress(order).total, 0),
       latestAt: mavaOrders[0]?.createdAt,
       sourceGroup: true,
     };
@@ -172,9 +176,9 @@ export function WorkspacePage({
             {view === "pedidos" && activeStatus !== "Todos" && (
               <Link className={`${ui.textButton} shrink-0 no-underline`} href="/pedidos">Ver todos</Link>
             )}
-            <label className={ui.searchBox}>
+            <label className={`${ui.searchBox} w-full! min-[681px]:w-72!`}>
               <SearchIcon />
-              <span className="sr-only">Buscar pedidos</span>
+              <span className="sr-only">{view === "pedidos" ? "Buscar pedidos" : "Buscar carpetas"}</span>
               <input
                 className={ui.searchInput}
                 onChange={(event) => setQuery(event.target.value)}
@@ -185,7 +189,8 @@ export function WorkspacePage({
           </div>
         </div>
 
-        <div className={ui.orderList}>
+        {view === "pedidos" && <FolderDropTargets />}
+        <div className={`${ui.orderList} @container`}>
           {dataSource === "loading" ? (
             <LoadingWorkspace />
           ) : view === "pedidos" ? (
@@ -266,7 +271,7 @@ function GlobalSearchResults({
         <div className="grid gap-4">
           {folders.length > 0 && (
             <div>
-              <h3 className="mb-2 text-[10px] font-semibold uppercase tracking-[.1em] text-[#87918c]">Carpetas</h3>
+              <h3 className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-[#87918c]">Carpetas</h3>
               <div className="grid grid-cols-2 gap-2 max-[520px]:grid-cols-1">
                 {folders.slice(0, 4).map((folder) => (
                   <Link
@@ -275,7 +280,7 @@ function GlobalSearchResults({
                     key={folder.id}
                   >
                     <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-[#e7efe9] text-[#235c4c] [&_svg]:size-4"><FolderIcon /></span>
-                    <span className="min-w-0 flex-1"><strong className="block truncate text-xs font-semibold">{folder.name}</strong><small className="mt-1 block text-[10px] text-[#7b8580]">Abrir carpeta</small></span>
+                    <span className="min-w-0 flex-1"><strong className="block truncate text-xs font-semibold">{folder.name.toLocaleUpperCase("es")}</strong><small className="mt-1 block text-[10px] text-[#7b8580]">Abrir carpeta</small></span>
                     <span className="text-[#a4aca8] [&_svg]:size-3"><ArrowIcon /></span>
                   </Link>
                 ))}
@@ -285,7 +290,7 @@ function GlobalSearchResults({
 
           {visibleOrders.length > 0 && (
             <div>
-              <h3 className="mb-2 text-[10px] font-semibold uppercase tracking-[.1em] text-[#87918c]">Pedidos</h3>
+              <h3 className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-[#87918c]">Pedidos</h3>
               <div className="divide-y divide-[#e7e9e6] overflow-hidden rounded-xl border border-[#e2e6e2] bg-white">
                 {visibleOrders.map((order) => (
                   <Link
@@ -436,7 +441,7 @@ function RecentNotifications({
           ))
         ) : visibleOrders.length ? visibleOrders.map((order) => (
           <Link
-            className={`${compact ? "min-h-14" : "min-h-[68px]"} grid grid-cols-[36px_minmax(0,1fr)_auto_14px] items-center gap-3 px-4 text-inherit no-underline transition-colors hover:bg-[#fafbf9] focus-visible:outline-2 focus-visible:outline-[#235c4c] max-[520px]:grid-cols-[36px_minmax(0,1fr)_14px]`}
+            className={`${compact ? "min-h-14" : "min-h-17"} grid grid-cols-[36px_minmax(0,1fr)_auto_14px] items-center gap-3 px-4 text-inherit no-underline transition-colors hover:bg-[#fafbf9] focus-visible:outline-2 focus-visible:outline-[#235c4c] max-[520px]:grid-cols-[36px_minmax(0,1fr)_14px]`}
             href={`/pedidos/${encodeURIComponent(order.id)}`}
             key={order.id}
           >
@@ -501,7 +506,7 @@ function LoadingWorkspace() {
     <div aria-busy="true" aria-label="Cargando pedidos">
       <div className={`${ui.tableGrid} ${ui.listHead}`}><span>Pedido</span><span>Estado</span><span>Imágenes</span><span>Creado</span><span /></div>
       {Array.from({ length: 5 }, (_, index) => (
-        <div className={`${ui.tableGrid} min-h-[70px] border-b border-[#eceeeb] px-4 last:border-b-0 max-[760px]:grid-cols-[1fr_auto]`} key={index}>
+        <div className={`${ui.tableGrid} min-h-17.5 border-b border-[#eceeeb] px-4 last:border-b-0 max-[760px]:grid-cols-[1fr_auto]`} key={index}>
           <span className="flex items-center gap-3">
             <span className="loading-skeleton size-10 shrink-0 rounded-lg" />
             <span className="grid w-full max-w-52 gap-2">
@@ -523,19 +528,8 @@ function LoadingWorkspace() {
 function OrdersList({ orders }: { orders: Order[] }) {
   return (
     <>
-      <div className={`${ui.tableGrid} ${ui.listHead}`}><span>Pedido</span><span>Estado</span><span>Imágenes</span><span>Creado</span><span /></div>
-      {orders.map((order) => (
-        <Link className={`${ui.tableGrid} ${ui.orderRow} no-underline text-inherit`} href={`/pedidos/${encodeURIComponent(order.id)}`} key={order.id}>
-          <span className={ui.orderIdentity}>
-            <span className={ui.orderCover} style={{ background: order.cover }}><ImageIcon /></span>
-          <span><strong>{order.code}</strong><small>Carpeta {order.clientName}{order.sourceSystem ? ` · ${order.sourceSystem}` : ""} · {order.canvasesOrdered ? "✓ Telas pedidas" : "⚠ Telas sin pedir"} · {formatArtworkProgress(order)} · {formatDate(order.createdAt)}</small></span>
-          </span>
-          <span className={ui.statusCell}><span className={`${ui.statusPill} ${statusStyles[order.status]}`}><i />{order.status}</span></span>
-          <span className={ui.imageCount}><ImageIcon /> {order.images.length}</span>
-          <span className={ui.dateCell}>{formatDate(order.createdAt)}</span>
-          <span className={ui.rowArrow}><ArrowIcon /></span>
-        </Link>
-      ))}
+      <div className={`${orderListGrid} hidden min-h-10 border-b border-[#e5e7e3] bg-[#fafbf9] px-4 text-[10px] font-medium uppercase tracking-wide text-[#7b8580] @min-[680px]:grid`}><span>Cliente / pedido</span><span>Estado</span><span>Creado</span><span className="sr-only">Acciones</span></div>
+      {orders.map((order) => <OrderListRow order={order} key={order.id} />)}
       {!orders.length && <div className={ui.emptyState}><SearchIcon /><strong>No encontramos pedidos</strong><span>Probá con otro código, carpeta o estado.</span></div>}
     </>
   );
@@ -586,10 +580,12 @@ function getOrderSearchIndex(order: Order) {
     order.code,
     order.clientId,
     order.clientName,
+    order.folderName,
     order.status,
     order.notes,
     order.contactName,
     order.whatsapp,
+    order.locality,
     order.sourceSystem,
     order.sourceOrderId,
     order.sourceStatus,
@@ -610,6 +606,7 @@ function describeOrderMatch(order: Order, query: string) {
     ["Notas", order.notes],
     ["Contacto", order.contactName],
     ["WhatsApp", order.whatsapp],
+    ["Localidad", order.locality],
     ["Origen", order.sourceSystem],
     ["Pedido de origen", order.sourceOrderId],
     ["Estado de origen", order.sourceStatus],
@@ -643,22 +640,21 @@ type FolderSummary = ClientFolder & {
 function FoldersList({ folders, isWorkspaceEmpty }: { folders: FolderSummary[]; isWorkspaceEmpty: boolean }) {
   return (
     <>
-      <div className={`${ui.tableGrid} ${ui.listHead}`}><span>Carpeta</span><span>Estado</span><span>Imágenes</span><span>Actividad</span><span /></div>
+      <div className={`${ui.tableGrid} ${ui.listHead}`}><span>Carpeta</span><span>Estado</span><span>Cuadros</span><span>Actividad</span><span /></div>
       {folders.map((folder) => (
-        <Link className={`${ui.tableGrid} ${ui.orderRow} no-underline text-inherit`} href={`/carpetas/${encodeURIComponent(folder.id)}`} key={folder.id}>
+        <FolderDropRow className={`${ui.tableGrid} ${ui.orderRow}`} folder={folder} key={folder.id}>
           <span className={ui.orderIdentity}>
             <span className={`${ui.orderCover} ${ui.folderCover}`}><FolderIcon /></span>
-            <span><strong>{folder.name}</strong><small>{folder.orderCount} pedido{folder.orderCount === 1 ? "" : "s"} {folder.sourceGroup ? "sincronizados" : "en la carpeta"}</small></span>
+            <span className="min-w-0"><strong>{folder.name.toLocaleUpperCase("es")}</strong><small>{folder.orderCount} pedido{folder.orderCount === 1 ? "" : "s"} {folder.sourceGroup ? (folder.orderCount === 1 ? "sincronizado" : "sincronizados") : "en la carpeta"}</small></span>
           </span>
           <span className={ui.statusCell}>
             <span className={`${ui.statusPill} ${folder.pendingCount ? statusStyles.Pendiente : statusStyles.Entregado}`}>
               <i />{folder.pendingCount ? `${folder.pendingCount} activo${folder.pendingCount === 1 ? "" : "s"}` : "Sin pedidos activos"}
             </span>
           </span>
-          <span className={ui.imageCount}><ImageIcon /> {folder.imageCount}</span>
+          <span className={ui.imageCount} aria-label={`${folder.imageCount} cuadros`}><ImageIcon /> {folder.imageCount}<span className="min-[761px]:hidden">cuadros</span></span>
           <span className={ui.dateCell}>{folder.latestAt ? formatDate(folder.latestAt) : "Sin actividad"}</span>
-          <span className={ui.rowArrow}><ArrowIcon /></span>
-        </Link>
+        </FolderDropRow>
       ))}
       {!folders.length && (
         <div className={ui.emptyState}>

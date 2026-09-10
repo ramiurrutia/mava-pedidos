@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Drawer } from "@base-ui/react/drawer";
+import { Dialog } from "@base-ui/react/dialog";
 import type { Order } from "../../../lib/orders";
 import type { OrderDetailsInput } from "../../../lib/supabase/orders-repository";
 import { CloseIcon, EditIcon, SaveIcon, SpinnerIcon } from "../icons";
@@ -20,6 +21,7 @@ export function OrderEditModal({
   const [contactName, setContactName] = useState(order.contactName ?? "");
   const [whatsapp, setWhatsapp] = useState(order.whatsapp ?? "");
   const [notes, setNotes] = useState(order.notes);
+  const [locality, setLocality] = useState(order.locality ?? "");
   const [saving, setSaving] = useState(false);
   const [isMobile, setIsMobile] = useState(() => typeof window !== "undefined" && window.matchMedia("(max-width: 719px)").matches);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -50,27 +52,9 @@ export function OrderEditModal({
     return () => window.cancelAnimationFrame(animationFrame);
   }, [isMobile]);
 
-  useEffect(() => {
-    if (isMobile) return;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = previousOverflow;
-    };
-  }, [isMobile]);
-
   useEffect(() => () => {
     if (closeTimer.current !== null) window.clearTimeout(closeTimer.current);
   }, []);
-
-  useEffect(() => {
-    function closeWithEscape(event: KeyboardEvent) {
-      if (event.key === "Escape") requestClose();
-    }
-
-    window.addEventListener("keydown", closeWithEscape);
-    return () => window.removeEventListener("keydown", closeWithEscape);
-  }, [requestClose]);
 
   async function saveDetails(event: React.FormEvent) {
     event.preventDefault();
@@ -81,6 +65,7 @@ export function OrderEditModal({
       clientName: clientName.trim(),
       contactName: contactName.trim(),
       whatsapp: whatsapp.trim(),
+      locality: locality.trim(),
       notes: notes.trim(),
     });
     setSaving(false);
@@ -93,6 +78,8 @@ export function OrderEditModal({
   if (isMobile) {
     return (
       <MobileOrderEditSheet
+        locality={locality}
+        onLocalityChange={setLocality}
         clientName={clientName}
         contactName={contactName}
         mobileOpen={mobileOpen}
@@ -123,13 +110,19 @@ export function OrderEditModal({
   }
 
   return (
+    <Dialog.Root open onOpenChange={(open, details) => {
+      if (open) return;
+      if (saving) details.cancel();
+      else requestClose();
+    }}>
+    <Dialog.Portal>
     <div
       className={`${closing ? "modal-backdrop-exit" : "modal-backdrop-enter"} fixed inset-0 z-50 flex items-end justify-center bg-[#101713]/50 backdrop-blur-[3px] min-[560px]:items-center min-[560px]:p-6`}
       onMouseDown={(event) => {
         if (event.currentTarget === event.target) requestClose();
       }}
     >
-      <section
+      <Dialog.Popup
         aria-labelledby="edit-order-modal-title"
         aria-modal="true"
         className={`${closing ? "modal-dialog-exit" : "modal-dialog-enter"} flex max-h-[calc(100dvh-env(safe-area-inset-top)-8px)] w-full max-w-[860px] flex-col overflow-hidden rounded-t-[22px] border border-[#dfe4e0] bg-white shadow-[0_28px_90px_rgb(12_24_18/30%)] min-[560px]:max-h-[calc(100dvh-48px)] min-[560px]:rounded-[22px] min-[720px]:grid min-[720px]:h-[min(540px,calc(100dvh-48px))] min-[720px]:grid-cols-[250px_minmax(0,1fr)]`}
@@ -187,6 +180,10 @@ export function OrderEditModal({
                   <input autoComplete="tel" inputMode="tel" maxLength={40} onChange={(event) => setWhatsapp(event.target.value)} placeholder="Número de WhatsApp" value={whatsapp} />
                 </label>
               </div>
+              <label className={ui.field}>
+                <span>Localidad (opcional)</span>
+                <input autoComplete="address-level2" maxLength={120} value={locality} onChange={(event) => setLocality(event.target.value)} placeholder="Ej. Mar del Plata" />
+              </label>
               <label className={`${ui.field} mb-0`}>
                 <span>Notas</span>
                 <textarea className="min-h-32 min-[720px]:min-h-40" maxLength={5000} onChange={(event) => setNotes(event.target.value)} placeholder="Indicaciones generales del pedido" rows={5} value={notes} />
@@ -202,12 +199,16 @@ export function OrderEditModal({
             </footer>
           </form>
         </div>
-      </section>
+      </Dialog.Popup>
     </div>
+    </Dialog.Portal>
+    </Dialog.Root>
   );
 }
 
 function MobileOrderEditSheet({
+  locality,
+  onLocalityChange,
   clientName,
   contactName,
   mobileOpen,
@@ -228,6 +229,8 @@ function MobileOrderEditSheet({
 }: {
   clientName: string;
   contactName: string;
+  locality: string;
+  onLocalityChange: (value: string) => void;
   mobileOpen: boolean;
   mobileSnapPoint: number | string | null;
   notes: string;
@@ -292,7 +295,11 @@ function MobileOrderEditSheet({
                     <span>WhatsApp</span>
                     <input autoComplete="tel" inputMode="tel" maxLength={40} onChange={(event) => onWhatsappChange(event.target.value)} placeholder="Número de WhatsApp" value={whatsapp} />
                   </label>
-                  <label className={`${ui.field} mb-0`}>
+                  <label className={ui.field}>
+                <span>Localidad (opcional)</span>
+                <input autoComplete="address-level2" maxLength={120} value={locality} onChange={(event) => onLocalityChange(event.target.value)} placeholder="Ej. Mar del Plata" />
+              </label>
+              <label className={`${ui.field} mb-0`}>
                     <span>Notas</span>
                     <textarea className="min-h-36" maxLength={5000} onChange={(event) => onNotesChange(event.target.value)} placeholder="Indicaciones generales del pedido" rows={5} value={notes} />
                   </label>

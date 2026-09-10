@@ -4,7 +4,7 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     id: "/",
     name: "MAVA Pedidos",
-    short_name: "MAVA",
+    short_name: "MAVA PEDIDOS",
     description: "Organización segura de pedidos e imágenes personalizadas.",
     start_url: "/",
     scope: "/",

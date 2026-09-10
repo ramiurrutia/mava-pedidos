@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { Toaster } from "sileo";
 import "sileo/styles.css";
 import {
-  isMavaStockOrder,
+  getOrderFolderId,
   MAVA_STOCK_FOLDER_ID,
   MAVA_STOCK_SOURCE,
   type OrderStatus,
@@ -18,6 +18,8 @@ import { type DashboardView, type WorkspaceView } from "./orders/shared";
 import { UploadToFolderPage } from "./orders/upload-to-folder-page";
 import { useOrdersWorkspace } from "./orders/use-orders-workspace";
 import { WorkspacePage } from "./orders/workspace-page";
+import { OrderDragProvider } from "./orders/order-drag-provider";
+import { ImportPdfPage } from "./orders/import-pdf-page";
 
 export function OrdersDashboard({
   view = "resumen",
@@ -48,6 +50,7 @@ export function OrdersDashboard({
   );
 
   return (
+    <OrderDragProvider>
     <AppShell activeView={activeView} memoryAction={navigationMemoryAction}>
       <Toaster
         offset={{ top: "calc(env(safe-area-inset-top) + 8px)" }}
@@ -67,6 +70,8 @@ export function OrdersDashboard({
         />
       ) : workspace.dataSource === "loading" ? (
         <LoadingPage />
+      ) : view === "importar-pdf" ? (
+        <ImportPdfPage />
       ) : view === "nuevo" ? (
         <CreateOrderPage
           folders={workspace.folders}
@@ -105,15 +110,14 @@ export function OrdersDashboard({
           folder={routeFolder}
           onClose={() => router.replace("/carpetas")}
           orders={workspace.orders
-            .filter((order) => routeFolder.id === MAVA_STOCK_FOLDER_ID
-              ? isMavaStockOrder(order)
-              : order.clientId === routeFolder.id && !isMavaStockOrder(order))
+            .filter((order) => getOrderFolderId(order) === routeFolder.id)
             .sort((left, right) => Date.parse(right.createdAt) - Date.parse(left.createdAt))}
         />
       ) : (
         <ResourceNotFound onClose={() => router.replace(activeView === "carpetas" ? "/carpetas" : activeView === "pedidos" ? "/pedidos" : "/")} />
       )}
     </AppShell>
+    </OrderDragProvider>
   );
 }
 
@@ -122,7 +126,7 @@ function isWorkspaceView(view: DashboardView): view is WorkspaceView {
 }
 
 function getActiveNavigationView(view: DashboardView): WorkspaceView {
-  if (view === "pedido" || view === "nuevo") return "pedidos";
+  if (view === "pedido" || view === "nuevo" || view === "importar-pdf") return "pedidos";
   if (view === "carpeta") return "carpetas";
   if (view === "subir") return "resumen";
   return view;
