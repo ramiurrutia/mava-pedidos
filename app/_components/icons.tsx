@@ -15,6 +15,7 @@ export {
   FiEdit2 as EditIcon,
   FiTrash2 as TrashIcon,
   FiSave as SaveIcon,
+  FiPrinter as PrinterIcon,
   FiX as CloseIcon,
   FiCheck as CheckIcon,
   FiLoader as SpinnerIcon,

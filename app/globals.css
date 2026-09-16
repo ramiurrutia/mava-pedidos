@@ -1,5 +1,67 @@
 @import "tailwindcss";
 
+.order-print {
+  display: none;
+}
+
+@media print {
+  @page mava-order {
+    size: A4;
+    margin: 14mm;
+  }
+
+  html:has(.order-print),
+  body:has(.order-print) {
+    display: block !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    background: white !important;
+  }
+
+  body:has(.order-print) > :not(.order-print) {
+    display: none !important;
+  }
+
+  .order-print {
+    display: block !important;
+    page: mava-order;
+    color: #111;
+    font: 10pt/1.45 Arial, sans-serif;
+    overflow-wrap: anywhere;
+  }
+
+  .order-print-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 8mm;
+    border-bottom: 1.5pt solid #333;
+    padding-bottom: 5mm;
+    margin-bottom: 5mm;
+  }
+
+  .order-print h1 { font-size: 20pt; font-weight: 700; margin: 2mm 0; }
+  .order-print h2 { font-size: 12pt; font-weight: 700; margin: 6mm 0 3mm; break-after: avoid; }
+  .order-print p { margin: 1mm 0; }
+  .order-print-details { display: grid; grid-template-columns: 1fr 1fr; gap: 3mm 8mm; }
+  .order-print-details dt { font-size: 9pt; color: #555; }
+  .order-print-details dd { margin: 0; }
+  .order-print table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  .order-print thead { display: table-header-group; }
+  .order-print th, .order-print td { text-align: left; vertical-align: top; border-bottom: 1pt solid #ccc; padding: 3mm 2mm; }
+  .order-print th:first-child { width: 30mm; }
+  .order-print th:nth-child(2) { width: 40%; }
+  .order-print img { width: 26mm; height: 26mm; object-fit: contain; }
+  .order-print-price { text-align: right !important; }
+  .order-print-total { text-align: right; margin-top: 4mm !important; font-size: 12pt; }
+  .order-print-artwork { display: flex; gap: 5mm; padding: 4mm 0; border-bottom: 1pt solid #ccc; }
+  .order-print-artwork img { width: 45mm; height: 45mm; flex-shrink: 0; }
+  .order-print-artwork figcaption { min-width: 0; }
+  .order-print-notes { white-space: pre-wrap; }
+  .order-print-missing { display: inline-block; color: #666; font-size: 9pt; }
+  .order-print tr, .order-print-artwork, .order-print-header, .order-print-details > div { break-inside: avoid; }
+}
+
 @keyframes page-enter {
   from {
     opacity: 0;

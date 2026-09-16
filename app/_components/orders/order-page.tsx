@@ -20,6 +20,7 @@ import { ArtworkLightbox, type ArtworkViewerEntry } from "./artwork-lightbox";
 import { ImageDescriptionEditor } from "./image-description-editor";
 import { OrderEditModal } from "./order-edit-modal";
 import { OrderPdfAttachment } from "./order-pdf-attachment";
+import { OrderPrintButton } from "./order-print";
 import { formatCurrency, statuses, statusStyles, ui } from "./shared";
 
 export function OrderPage({
@@ -175,7 +176,10 @@ export function OrderPage({
 
   return (
     <section className={ui.pagePanel} aria-labelledby="order-title">
-      <button className={ui.backButton} type="button" onClick={onClose}><BackIcon /> Volver</button>
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+        <button className={ui.backButton} type="button" onClick={onClose}><BackIcon /> Volver</button>
+        <OrderPrintButton key={order.id} order={order} />
+      </div>
       <div className={ui.pageCard}>
         <div className={ui.pageHead}>
           <div>

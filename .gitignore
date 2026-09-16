@@ -12,6 +12,11 @@
 
 # testing
 /coverage
+/playwright-report/
+/test-results/
+/.print-check-*/
+
+# generated PDF.js worker
 /public/pdfjs/
 
 # next.js
@@ -23,13 +28,25 @@
 
 # misc
 .DS_Store
+Thumbs.db
+Desktop.ini
 *.pem
+*.swp
+*.swo
+
+# local caches and temporary files
+/.cache/
+/.tmp/
+/tmp/
+/supabase/.temp/
+*.tmp
 
 # debug
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
+*.log
 
 # env files (can opt-in for committing if needed)
 .env*
