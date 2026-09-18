@@ -118,14 +118,15 @@ export function CreateOrderPage({
               notes={notes}
               onClientNameChange={setClientName}
               onCanvasesOrderedChange={setCanvasesOrdered}
-              onFilesChange={(files) => setUploads(createPendingImageUploads(files))}
+              onFilesChange={(files) => setUploads((current) => [...current, ...createPendingImageUploads(files)])}
               onPasteImages={(files) => setUploads((current) => [...current, ...createPendingImageUploads(files)])}
+              onRemoveImage={(index) => setUploads((current) => current.filter((_, currentIndex) => currentIndex !== index))}
               onNotesChange={setNotes}
               uploads={uploads}
             />
           ) : step === 2 ? (
             <ImagePasteArea disabled={saving} onImages={(files) => setUploads((current) => [...current, ...createPendingImageUploads(files)])}>
-              <ImageDescriptionEditor onChange={setUploads} uploads={uploads} />
+              <ImageDescriptionEditor disabled={saving} onChange={(next) => { setUploads(next); if (!next.length) setStep(1); }} uploads={uploads} />
             </ImagePasteArea>
           ) : (
             <AssignmentStep
@@ -166,6 +167,7 @@ function FirstStep({
   onCanvasesOrderedChange,
   onFilesChange,
   onPasteImages,
+  onRemoveImage,
   onNotesChange,
 }: {
   clientName: string;
@@ -180,6 +182,7 @@ function FirstStep({
   onLocalityChange: (value: string) => void;
   onFilesChange: (files: File[]) => void;
   onPasteImages: (files: File[]) => void;
+  onRemoveImage: (index: number) => void;
   onNotesChange: (value: string) => void;
 }) {
   return (
@@ -219,13 +222,13 @@ function FirstStep({
       </fieldset>
       <ImagePasteArea onImages={onPasteImages}>
       <div className={ui.uploadZone}>
-        <input ref={fileInput} type="file" accept="image/*" multiple hidden onChange={(event) => onFilesChange(Array.from(event.target.files ?? []))} />
+        <input ref={fileInput} type="file" accept="image/*" multiple hidden onChange={(event) => { onFilesChange(Array.from(event.target.files ?? [])); event.target.value = ""; }} />
         <UploadIcon />
         <strong>{uploads.length ? `${uploads.length} imagen${uploads.length === 1 ? "" : "es"} seleccionada${uploads.length === 1 ? "" : "s"}` : "Agregar imágenes"}</strong>
         <span>{uploads.length ? "En el próximo paso podrás escribir una nota para cada imagen." : "Podés crear el pedido sin imágenes y agregarlas después."}</span>
         <button type="button" className={ui.secondaryButton} onClick={() => fileInput.current?.click()}>Seleccionar archivos</button>
       </div>
-      {uploads.length > 0 && <SelectedImageThumbnails uploads={uploads} />}
+      {uploads.length > 0 && <SelectedImageThumbnails uploads={uploads} onRemove={onRemoveImage} />}
       </ImagePasteArea>
     </>
   );

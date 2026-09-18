@@ -2,16 +2,18 @@
 
 import { useState } from "react";
 import type { PendingImageUpload } from "../../../lib/orders";
-import { ArrowIcon, BackIcon } from "../icons";
+import { ArrowIcon, BackIcon, TrashIcon } from "../icons";
 import { LocalImagePreview } from "./local-image-preview";
 import { ui } from "./shared";
 
 export function ImageDescriptionEditor({
   uploads,
   onChange,
+  disabled = false,
 }: {
   uploads: PendingImageUpload[];
   onChange: (uploads: PendingImageUpload[]) => void;
+  disabled?: boolean;
 }) {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const currentIndex = Math.min(selectedIndex, Math.max(uploads.length - 1, 0));
@@ -20,9 +22,16 @@ export function ImageDescriptionEditor({
   if (!current) return null;
 
   function updateDescription(description: string) {
+    if (disabled) return;
     onChange(uploads.map((upload, index) => (
       index === currentIndex ? { ...upload, description } : upload
     )));
+  }
+
+  function removeCurrentImage() {
+    if (disabled) return;
+    onChange(uploads.filter((_, index) => index !== currentIndex));
+    setSelectedIndex(Math.max(0, Math.min(currentIndex, uploads.length - 2)));
   }
 
   return (
@@ -40,11 +49,17 @@ export function ImageDescriptionEditor({
       <div className="relative aspect-4/3 overflow-hidden rounded-xl bg-[#202825]">
         <LocalImagePreview alt={current.file.name} file={current.file} />
       </div>
+      <div className="flex justify-end">
+        <button className={`${ui.secondaryButton} text-[#a34e42]`} disabled={disabled} onClick={removeCurrentImage} type="button">
+          <TrashIcon />Quitar imagen
+        </button>
+      </div>
 
       <label className={`${ui.field} mb-0`}>
         <span>Nota de esta imagen</span>
         <textarea
           autoFocus
+          disabled={disabled}
           maxLength={1000}
           onChange={(event) => updateDescription(event.target.value)}
           placeholder="Escribir descripción"

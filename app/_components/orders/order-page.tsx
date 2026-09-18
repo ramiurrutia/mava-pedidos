@@ -104,8 +104,8 @@ export function OrderPage({
   }, []);
 
   function selectImages(files: File[]) {
-    if (!files.length) return;
-    setPendingUploads(createPendingImageUploads(files));
+    if (!files.length || uploading || !canAddImages) return;
+    setPendingUploads((current) => [...current, ...createPendingImageUploads(files)]);
   }
 
   async function addImages() {
@@ -269,8 +269,8 @@ export function OrderPage({
               <span className="block h-full rounded-full bg-[#3f765f] transition-[width] duration-300" style={{ width: `${artworkProgress.percentage}%` }} />
             </div>
           </div>
-          <input ref={fileInput} type="file" accept="image/*" multiple hidden onChange={(event) => selectImages(Array.from(event.target.files ?? []))} />
-          <ImagePasteArea className="order-6" disabled={uploading || !canAddImages} onImages={(files) => setPendingUploads((current) => [...current, ...createPendingImageUploads(files)])}>
+          <input ref={fileInput} type="file" accept="image/*" multiple hidden disabled={uploading || !canAddImages} onChange={(event) => { selectImages(Array.from(event.target.files ?? [])); event.target.value = ""; }} />
+          <ImagePasteArea className="order-6" disabled={uploading || !canAddImages} onImages={selectImages}>
           {!pendingUploads.length ? (
             <button className={`${ui.primaryButton} order-6 w-full`} disabled={uploading || !canAddImages} onClick={() => fileInput.current?.click()} type="button">
               <UploadIcon />
@@ -278,8 +278,9 @@ export function OrderPage({
             </button>
           ) : (
             <div className="order-6 grid gap-4 rounded-xl border border-[#dfe5e1] bg-[#fafbf9] p-4">
-              <ImageDescriptionEditor onChange={setPendingUploads} uploads={pendingUploads} />
-              <div className="flex justify-end gap-2">
+              <ImageDescriptionEditor disabled={uploading || !canAddImages} onChange={setPendingUploads} uploads={pendingUploads} />
+              <div className="flex flex-wrap justify-end gap-2">
+                <button className={ui.secondaryButton} disabled={uploading || !canAddImages} onClick={() => fileInput.current?.click()} type="button"><UploadIcon />Agregar más imágenes</button>
                 <button className={ui.secondaryButton} disabled={uploading} onClick={cancelImages} type="button">Cancelar</button>
                 <button className={ui.primaryButton} disabled={uploading || !canAddImages} onClick={() => void addImages()} type="button">
                   {uploading ? <SpinnerIcon className="animate-spin" /> : <UploadIcon />}{uploading ? "Subiendo..." : `Subir ${pendingUploads.length} imagen${pendingUploads.length === 1 ? "" : "es"}`}

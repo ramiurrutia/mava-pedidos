@@ -2,6 +2,7 @@
 
 import { useCallback } from "react";
 import type { PendingImageUpload } from "../../../lib/orders";
+import { TrashIcon } from "../icons";
 
 export function LocalImagePreview({ file, alt }: { file: File; alt: string }) {
   const attachPreview = useCallback((element: HTMLSpanElement | null) => {
@@ -21,7 +22,7 @@ export function LocalImagePreview({ file, alt }: { file: File; alt: string }) {
   );
 }
 
-export function SelectedImageThumbnails({ uploads }: { uploads: PendingImageUpload[] }) {
+export function SelectedImageThumbnails({ uploads, onRemove }: { uploads: PendingImageUpload[]; onRemove?: (index: number) => void }) {
   return (
     <div aria-label="Imágenes seleccionadas" className="mt-3 flex gap-2 overflow-x-auto px-0.5 pb-1 pt-0.5">
       {uploads.map(({ file }, index) => (
@@ -31,6 +32,12 @@ export function SelectedImageThumbnails({ uploads }: { uploads: PendingImageUplo
           title={file.name}
         >
           <LocalImagePreview alt={file.name} file={file} />
+          {onRemove && <button
+            aria-label={`Quitar imagen ${index + 1}: ${file.name}`}
+            className="absolute right-0 top-0 grid size-8 cursor-pointer place-items-center rounded-bl-lg bg-white/95 text-[#a34e42] shadow-sm hover:bg-[#fff0ed] focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[#a34e42] [&_svg]:size-4"
+            onClick={() => onRemove(index)}
+            type="button"
+          ><TrashIcon /></button>}
           <span className="absolute bottom-1 right-1 grid size-4 place-items-center rounded-full bg-[#1d2b26]/80 text-[8px] font-semibold text-white">{index + 1}</span>
         </div>
       ))}

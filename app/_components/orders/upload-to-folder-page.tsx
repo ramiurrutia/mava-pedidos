@@ -115,18 +115,18 @@ export function UploadToFolderPage({
               </label>
               <ImagePasteArea disabled={uploading} onImages={(files) => setUploads((current) => [...current, ...createPendingImageUploads(files)])}>
               <div className={ui.uploadZone}>
-                <input ref={fileInput} type="file" accept="image/*" multiple hidden onChange={(event) => setUploads(createPendingImageUploads(Array.from(event.target.files ?? [])))} />
+                <input ref={fileInput} type="file" accept="image/*" multiple hidden onChange={(event) => { const files = Array.from(event.target.files ?? []); setUploads((current) => [...current, ...createPendingImageUploads(files)]); event.target.value = ""; }} />
                 <UploadIcon />
                 <strong>{uploads.length ? `${uploads.length} imagen${uploads.length === 1 ? "" : "es"} lista${uploads.length === 1 ? "" : "s"}` : "Seleccioná las imágenes"}</strong>
                 <span>En el próximo paso podrás escribir una nota para cada imagen.</span>
                 <button type="button" className={ui.secondaryButton} onClick={() => fileInput.current?.click()}>Seleccionar archivos</button>
               </div>
-              {uploads.length > 0 && <SelectedImageThumbnails uploads={uploads} />}
+              {uploads.length > 0 && <SelectedImageThumbnails uploads={uploads} onRemove={(index) => setUploads((current) => current.filter((_, currentIndex) => currentIndex !== index))} />}
               </ImagePasteArea>
             </>
           ) : step === 2 ? (
             <ImagePasteArea disabled={uploading} onImages={(files) => setUploads((current) => [...current, ...createPendingImageUploads(files)])}>
-              <ImageDescriptionEditor onChange={setUploads} uploads={uploads} />
+              <ImageDescriptionEditor disabled={uploading} onChange={(next) => { setUploads(next); if (!next.length) setStep(1); }} uploads={uploads} />
             </ImagePasteArea>
           ) : (
             <div className={ui.assignmentStep}>
