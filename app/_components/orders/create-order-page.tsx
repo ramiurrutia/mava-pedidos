@@ -105,7 +105,7 @@ export function CreateOrderPage({
           <div><p className={ui.eyebrow}>Nuevo pedido · Paso {displayedStep} de {totalSteps}</p><h2 id="new-order-title">{title}</h2></div>
         </div>
         <form onSubmit={submit}>
-          {step === 1 && <Link href="/pedidos/importar" className="mb-5 flex items-center gap-3 rounded-xl border border-[#cbdcd1] bg-[#f0f6f1] p-4 text-inherit no-underline transition-colors hover:bg-[#e6f0e8] focus-visible:outline-2 focus-visible:outline-[#235c4c]"><FileIcon className="size-5 shrink-0 text-[#235c4c]" /><span><strong className="block text-sm font-semibold">¿Tenés el pedido en PDF?</strong><small className="mt-1 block text-xs text-[#68726d]">Importar datos, cantidades y fotos con vista previa</small></span></Link>}
+          {step === 1 && <Link href="/pedidos/importar" className="mb-5 flex items-center gap-3 rounded-xl border border-[#cbdcd1] bg-[#f0f6f1] p-4 text-inherit no-underline transition-colors hover:bg-[#e6f0e8] focus-visible:outline-2 focus-visible:outline-[#235c4c]"><FileIcon className="size-5 shrink-0 text-[#235c4c]" /><span><strong className="block text-sm font-semibold">¿Tenés el pedido en PDF o Excel?</strong><small className="mt-1 block text-xs text-[#68726d]">Importar datos, cantidades y fotos con vista previa</small></span></Link>}
           {step === 1 ? (
             <FirstStep
               locality={locality}

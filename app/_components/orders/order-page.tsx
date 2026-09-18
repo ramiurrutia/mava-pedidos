@@ -294,7 +294,7 @@ export function OrderPage({
             </div>
           )}
             <OrderNotes notes={order.notes} fromPdf={order.sourceSystem === "PDF"} />
-            {order.sourceSystem === "PDF" && <OrderPdfAttachment orderId={order.id} complete={order.sourceStatus === "pdf_complete"} />}
+            {(order.sourceSystem === "PDF" || order.sourceSystem === "EXCEL") && <OrderPdfAttachment key={order.id} orderId={order.id} format={order.sourceSystem} complete={order.sourceStatus === "pdf_complete" || order.sourceStatus === "excel_complete"} />}
           {(order.items?.length ?? 0) > 0 && (
             <div className={`${ui.detailBlock} order-4`}>
               <div className={ui.detailTitle}>

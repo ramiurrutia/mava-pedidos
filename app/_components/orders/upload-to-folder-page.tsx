@@ -55,7 +55,7 @@ export function UploadToFolderPage({
             <strong id="upload-folder-title">Todavía no hay carpetas</strong>
             <span>Creá el primer pedido y su carpeta aparecerá automáticamente.</span>
             <Link className={`${ui.primaryButton} mt-2 no-underline`} href="/pedidos/nuevo">Crear primer pedido</Link>
-            <Link className={`${ui.secondaryButton} no-underline`} href="/pedidos/importar"><FileIcon />Importar pedido desde PDF</Link>
+            <Link className={`${ui.secondaryButton} no-underline`} href="/pedidos/importar"><FileIcon />Importar pedido desde PDF o Excel</Link>
           </div>
         </div>
       </section>
@@ -103,7 +103,7 @@ export function UploadToFolderPage({
           </div>
         </div>
         <form onSubmit={submit}>
-          {step === 1 && <Link href="/pedidos/importar" className="mb-4 flex min-h-12 items-center gap-2 rounded-xl bg-[#edf4ee] px-3 text-xs font-semibold text-[#235c4c] no-underline"><FileIcon />¿Es un PDF? Importar como pedido nuevo</Link>}
+          {step === 1 && <Link href="/pedidos/importar" className="mb-4 flex min-h-12 items-center gap-2 rounded-xl bg-[#edf4ee] px-3 text-xs font-semibold text-[#235c4c] no-underline"><FileIcon />¿Es un PDF o Excel? Importar como pedido nuevo</Link>}
           {step === 1 ? (
             <>
               <label className={ui.field}>
