@@ -14,6 +14,7 @@ import { BackIcon, CheckIcon, FileIcon, SpinnerIcon, UploadIcon } from "../icons
 import { ui } from "./shared";
 import { ImageDescriptionEditor } from "./image-description-editor";
 import { SelectedImageThumbnails } from "./local-image-preview";
+import { ImagePasteArea } from "./image-paste-area";
 
 export function CreateOrderPage({
   folders,
@@ -118,11 +119,14 @@ export function CreateOrderPage({
               onClientNameChange={setClientName}
               onCanvasesOrderedChange={setCanvasesOrdered}
               onFilesChange={(files) => setUploads(createPendingImageUploads(files))}
+              onPasteImages={(files) => setUploads((current) => [...current, ...createPendingImageUploads(files)])}
               onNotesChange={setNotes}
               uploads={uploads}
             />
           ) : step === 2 ? (
-            <ImageDescriptionEditor onChange={setUploads} uploads={uploads} />
+            <ImagePasteArea disabled={saving} onImages={(files) => setUploads((current) => [...current, ...createPendingImageUploads(files)])}>
+              <ImageDescriptionEditor onChange={setUploads} uploads={uploads} />
+            </ImagePasteArea>
           ) : (
             <AssignmentStep
               assignment={assignment}
@@ -161,6 +165,7 @@ function FirstStep({
   onClientNameChange,
   onCanvasesOrderedChange,
   onFilesChange,
+  onPasteImages,
   onNotesChange,
 }: {
   clientName: string;
@@ -174,6 +179,7 @@ function FirstStep({
   locality: string;
   onLocalityChange: (value: string) => void;
   onFilesChange: (files: File[]) => void;
+  onPasteImages: (files: File[]) => void;
   onNotesChange: (value: string) => void;
 }) {
   return (
@@ -211,6 +217,7 @@ function FirstStep({
           </button>
         </div>
       </fieldset>
+      <ImagePasteArea onImages={onPasteImages}>
       <div className={ui.uploadZone}>
         <input ref={fileInput} type="file" accept="image/*" multiple hidden onChange={(event) => onFilesChange(Array.from(event.target.files ?? []))} />
         <UploadIcon />
@@ -219,6 +226,7 @@ function FirstStep({
         <button type="button" className={ui.secondaryButton} onClick={() => fileInput.current?.click()}>Seleccionar archivos</button>
       </div>
       {uploads.length > 0 && <SelectedImageThumbnails uploads={uploads} />}
+      </ImagePasteArea>
     </>
   );
 }

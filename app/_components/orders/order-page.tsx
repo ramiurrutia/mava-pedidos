@@ -18,6 +18,7 @@ import type { OrderDetailsInput } from "../../../lib/supabase/orders-repository"
 import { BackIcon, CheckIcon, EditIcon, ImageIcon, MoreIcon, SpinnerIcon, TrashIcon, UploadIcon } from "../icons";
 import { ArtworkLightbox, type ArtworkViewerEntry } from "./artwork-lightbox";
 import { ImageDescriptionEditor } from "./image-description-editor";
+import { ImagePasteArea } from "./image-paste-area";
 import { OrderEditModal } from "./order-edit-modal";
 import { OrderPdfAttachment } from "./order-pdf-attachment";
 import { OrderPrintButton } from "./order-print";
@@ -108,7 +109,7 @@ export function OrderPage({
   }
 
   async function addImages() {
-    if (!pendingUploads.length || uploading) return;
+    if (!pendingUploads.length || uploading || !canAddImages) return;
     setUploading(true);
     const uploaded = await onAddImages(pendingUploads);
     setUploading(false);
@@ -269,6 +270,7 @@ export function OrderPage({
             </div>
           </div>
           <input ref={fileInput} type="file" accept="image/*" multiple hidden onChange={(event) => selectImages(Array.from(event.target.files ?? []))} />
+          <ImagePasteArea className="order-6" disabled={uploading || !canAddImages} onImages={(files) => setPendingUploads((current) => [...current, ...createPendingImageUploads(files)])}>
           {!pendingUploads.length ? (
             <button className={`${ui.primaryButton} order-6 w-full`} disabled={uploading || !canAddImages} onClick={() => fileInput.current?.click()} type="button">
               <UploadIcon />
@@ -279,12 +281,13 @@ export function OrderPage({
               <ImageDescriptionEditor onChange={setPendingUploads} uploads={pendingUploads} />
               <div className="flex justify-end gap-2">
                 <button className={ui.secondaryButton} disabled={uploading} onClick={cancelImages} type="button">Cancelar</button>
-                <button className={ui.primaryButton} disabled={uploading} onClick={() => void addImages()} type="button">
+                <button className={ui.primaryButton} disabled={uploading || !canAddImages} onClick={() => void addImages()} type="button">
                   {uploading ? <SpinnerIcon className="animate-spin" /> : <UploadIcon />}{uploading ? "Subiendo..." : `Subir ${pendingUploads.length} imagen${pendingUploads.length === 1 ? "" : "es"}`}
                 </button>
               </div>
             </div>
           )}
+          </ImagePasteArea>
           <div className={`${ui.safetyNote} order-7 -mt-2`}><span>✓</span><p><strong>Vinculado</strong>Las imágenes se vinculan a {order.code} mediante su ID.</p></div>
           {(order.sourceSystem || order.contactName || order.whatsapp || order.locality) && (
             <div className="order-9 grid grid-cols-2 gap-3 rounded-lg border border-[#e4e7e3] bg-[#fafbf9] p-3 max-[480px]:grid-cols-1">

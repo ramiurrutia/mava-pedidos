@@ -14,6 +14,7 @@ import { BackIcon, FileIcon, SpinnerIcon, UploadIcon } from "../icons";
 import { ui } from "./shared";
 import { ImageDescriptionEditor } from "./image-description-editor";
 import { SelectedImageThumbnails } from "./local-image-preview";
+import { ImagePasteArea } from "./image-paste-area";
 
 export function UploadToFolderPage({
   folders,
@@ -112,6 +113,7 @@ export function UploadToFolderPage({
                   {folders.map((folder) => <option value={folder.id} key={folder.id}>{folder.name.toLocaleUpperCase("es")}</option>)}
                 </select>
               </label>
+              <ImagePasteArea disabled={uploading} onImages={(files) => setUploads((current) => [...current, ...createPendingImageUploads(files)])}>
               <div className={ui.uploadZone}>
                 <input ref={fileInput} type="file" accept="image/*" multiple hidden onChange={(event) => setUploads(createPendingImageUploads(Array.from(event.target.files ?? [])))} />
                 <UploadIcon />
@@ -120,9 +122,12 @@ export function UploadToFolderPage({
                 <button type="button" className={ui.secondaryButton} onClick={() => fileInput.current?.click()}>Seleccionar archivos</button>
               </div>
               {uploads.length > 0 && <SelectedImageThumbnails uploads={uploads} />}
+              </ImagePasteArea>
             </>
           ) : step === 2 ? (
-            <ImageDescriptionEditor onChange={setUploads} uploads={uploads} />
+            <ImagePasteArea disabled={uploading} onImages={(files) => setUploads((current) => [...current, ...createPendingImageUploads(files)])}>
+              <ImageDescriptionEditor onChange={setUploads} uploads={uploads} />
+            </ImagePasteArea>
           ) : (
             <div className={ui.assignmentStep}>
               <button type="button" className={`${ui.assignmentCard} ${assignment === "new" ? ui.assignmentSelected : ""}`} onClick={() => setAssignment("new")}>
