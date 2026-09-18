@@ -358,6 +358,19 @@ export async function deleteRemoteOrder(orderId: string) {
   if (data !== true) throw new Error("ORDER_NOT_FOUND");
 }
 
+export async function deleteRemoteOrderImage(orderId: string, imageId: string) {
+  const { data, error } = await createClient().rpc("soft_delete_order_image", {
+    requested_order_id: orderId,
+    requested_image_id: imageId,
+  });
+  if (error) {
+    if (error.code === "PGRST202" || error.code === "42883") throw new Error("Falta aplicar la migración de eliminación de imágenes en Supabase.");
+    if (error.message.includes("DOCUMENT_IMPORT_INCOMPLETE")) throw new Error("Completá la importación del documento antes de eliminar sus imágenes.");
+    throw new Error("No se pudo eliminar la imagen. Revisá la conexión e intentá nuevamente.");
+  }
+  if (data !== true) throw new Error("La imagen no pertenece a este pedido o ya no está disponible.");
+}
+
 export async function uploadRemoteImages({
   clientId,
   orderId,

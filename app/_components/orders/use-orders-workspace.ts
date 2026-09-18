@@ -19,6 +19,7 @@ import {
   createRemoteOrder,
   moveRemoteOrder,
   deleteRemoteOrder,
+  deleteRemoteOrderImage,
   loadWorkspace,
   updateRemoteOrderDetails,
   updateRemoteImageDescription,
@@ -47,6 +48,8 @@ function useOrdersWorkspaceState() {
   const syncPromise = useRef<Promise<boolean> | null>(null);
   const lastSyncAt = useRef(0);
   const movingOrders = useRef(new Set<string>());
+  const deletingImages = useRef(new Set<string>());
+  const deletedImageIds = useRef(new Set<string>());
 
   async function moveOrder(orderId: string, folderId: string) {
     if (dataSource !== "supabase" || movingOrders.current.has(orderId)) return false;
@@ -100,7 +103,8 @@ function useOrdersWorkspaceState() {
       try {
         const workspace = await loadWorkspace();
         setFolders(workspace.folders);
-        setOrders(workspace.orders);
+        // A refresh started before deletion must not bring the image back.
+        setOrders(workspace.orders.map((order) => ({ ...order, images: order.images.filter((image) => !deletedImageIds.current.has(image.id)) })));
         setDataSource("supabase");
         return true;
       } catch {
@@ -422,6 +426,23 @@ function useOrdersWorkspaceState() {
     }
   }
 
+  async function deleteImage(orderId: string, imageId: string) {
+    if (dataSource !== "supabase" || deletingImages.current.has(imageId)) return false;
+    deletingImages.current.add(imageId);
+    try {
+      await deleteRemoteOrderImage(orderId, imageId);
+      deletedImageIds.current.add(imageId);
+      setOrders((current) => current.map((order) => order.id === orderId
+        ? { ...order, images: order.images.filter((image) => image.id !== imageId) }
+        : order));
+      sileo.success({ title: "Imagen eliminada", description: "La imagen se quitó del pedido." });
+      return true;
+    } catch (error) {
+      sileo.error({ title: "No se pudo eliminar la imagen", description: error instanceof Error ? error.message : "Intentá nuevamente." });
+      return false;
+    } finally { deletingImages.current.delete(imageId); }
+  }
+
   async function uploadImagesToFolder(clientId: string, uploads: PendingImageUpload[], requestedOrderId?: string) {
     if (dataSource !== "supabase" || !uploads.length) return false;
     const folder = folders.find((candidate) => candidate.id === clientId);
@@ -518,6 +539,7 @@ function useOrdersWorkspaceState() {
     updateOrderDetails,
     updateImageDescription,
     deleteOrder,
+    deleteImage,
     uploadImagesToFolder,
     createPendingOrderWithImages,
   };

@@ -22,6 +22,7 @@ import { ImagePasteArea } from "./image-paste-area";
 import { OrderEditModal } from "./order-edit-modal";
 import { OrderPdfAttachment } from "./order-pdf-attachment";
 import { OrderPrintButton } from "./order-print";
+import { DeleteImageDialog } from "./delete-image-dialog";
 import { formatCurrency, statuses, statusStyles, ui } from "./shared";
 
 export function OrderPage({
@@ -31,6 +32,7 @@ export function OrderPage({
   onAddImages,
   onEdit,
   onEditImageDescription,
+  onDeleteImage,
   onCanvasesOrderedChange,
   onArtworkPreparationChange,
   onDelete,
@@ -41,6 +43,7 @@ export function OrderPage({
   onAddImages: (uploads: PendingImageUpload[]) => Promise<boolean>;
   onEdit: (input: OrderDetailsInput) => Promise<boolean>;
   onEditImageDescription: (imageId: string, description: string) => Promise<string | null>;
+  onDeleteImage: (imageId: string) => Promise<boolean>;
   onCanvasesOrderedChange: (value: boolean) => Promise<boolean>;
   onArtworkPreparationChange: (artworkKey: string, status: ArtworkPreparationStatus) => Promise<boolean>;
   onDelete: () => Promise<boolean>;
@@ -56,6 +59,7 @@ export function OrderPage({
   const [actionsOpen, setActionsOpen] = useState(false);
   const [updatingArtworkKeys, setUpdatingArtworkKeys] = useState<Set<string>>(() => new Set());
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
+  const [imageToDelete, setImageToDelete] = useState<OrderImage | null>(null);
   const canAddImages = isOrderActive(order.status);
   const artworkProgress = getOrderArtworkProgress(order);
   const viewerEntries: ArtworkViewerEntry[] = [
@@ -349,9 +353,9 @@ export function OrderPage({
             <div className={ui.detailTitle}><span>Imágenes agregadas</span><small>{order.images.length} archivos</small></div>
             <div className={ui.imageGrid}>
               {order.images.map((image, index) => (
+                <div className="grid min-w-0 gap-1" key={image.id}>
                 <div
                   className={`${ui.imageTile} ${image.previewUrl ? ui.imagePreview : ""} relative overflow-hidden border-0 text-left transition-transform hover:scale-[1.015]`}
-                  key={image.id}
                   style={image.previewUrl ? { backgroundImage: `url("${image.previewUrl}")` } : index === 0 ? { background: order.cover } : undefined}
                 >
                   <button
@@ -376,6 +380,8 @@ export function OrderPage({
                   <small>{image.description || image.name}</small>
                   <time dateTime={image.addedAt}>{new Intl.DateTimeFormat("es-AR", { dateStyle: "short", timeStyle: "short" }).format(new Date(image.addedAt))}</time>
                 </div>
+                <button aria-label={`Eliminar imagen ${image.name}`} className={`${ui.textButton} justify-self-end px-2 text-[#a34e42] hover:bg-[#fff0ed]`} disabled={deleting || updatingArtworkKeys.has(image.preparationKey)} onClick={() => setImageToDelete(image)} type="button"><TrashIcon />Eliminar imagen</button>
+                </div>
               ))}
               {!order.images.length && <div className={ui.detailEmpty}>Todavía no hay imágenes.</div>}
             </div>
@@ -383,6 +389,7 @@ export function OrderPage({
         </div>
       </div>
 
+      {imageToDelete && <DeleteImageDialog image={imageToDelete} orderCode={order.code} onDelete={onDeleteImage} onClose={() => setImageToDelete(null)} />}
       {viewerIndex !== null && (
         <ArtworkLightbox
           entries={viewerEntries}

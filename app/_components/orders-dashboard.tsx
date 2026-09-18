@@ -100,6 +100,7 @@ export function OrdersDashboard({
           }}
           onEdit={(details) => workspace.updateOrderDetails(routeOrder.id, details)}
           onEditImageDescription={(imageId, description) => workspace.updateImageDescription(routeOrder.id, imageId, description)}
+          onDeleteImage={(imageId) => workspace.deleteImage(routeOrder.id, imageId)}
           onCanvasesOrderedChange={(value) => workspace.updateCanvasesOrdered(routeOrder.id, value)}
           onArtworkPreparationChange={(artworkKey, status) => workspace.updateArtworkPreparation(routeOrder.id, artworkKey, status)}
           onStatusChange={(status) => workspace.updateStatus(routeOrder.id, status)}
