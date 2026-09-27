@@ -10,6 +10,7 @@ import {
   isOrderActive,
   type ArtworkPreparationStatus,
   type ClientFolder,
+  type ImageDetails,
   type Order,
   type OrderStatus,
   type PendingImageUpload,
@@ -22,7 +23,7 @@ import {
   deleteRemoteOrderImage,
   loadWorkspace,
   updateRemoteOrderDetails,
-  updateRemoteImageDescription,
+  updateRemoteImageDetails,
   updateRemoteCanvasesOrdered,
   updateRemoteArtworkPreparation,
   updateRemoteOrderStatus,
@@ -377,29 +378,29 @@ function useOrdersWorkspaceState() {
     }
   }
 
-  async function updateImageDescription(orderId: string, imageId: string, description: string) {
+  async function updateImageDetails(orderId: string, imageId: string, details: ImageDetails) {
     if (dataSource !== "supabase") return null;
     try {
-      const savedDescription = await updateRemoteImageDescription(imageId, description);
+      const savedDetails = await updateRemoteImageDetails(imageId, details);
       setOrders((currentOrders) => currentOrders.map((order) => (
         order.id === orderId
           ? {
               ...order,
               images: order.images.map((image) => (
-                image.id === imageId ? { ...image, description: savedDescription } : image
+                image.id === imageId ? { ...image, ...savedDetails } : image
               )),
             }
           : order
       )));
       sileo.success({
-        title: "Descripción actualizada",
-        description: "La nota de la imagen se guardó correctamente.",
+        title: "Imagen actualizada",
+        description: "El título y la descripción se guardaron correctamente.",
       });
-      return savedDescription;
+      return savedDetails;
     } catch {
       sileo.error({
-        title: "No se pudo guardar la descripción",
-        description: "La nota anterior se mantuvo. Intenta nuevamente.",
+        title: "No se pudieron guardar los datos de la imagen",
+        description: "El título y la descripción anteriores se mantuvieron. Intentá nuevamente.",
       });
       return null;
     }
@@ -537,7 +538,7 @@ function useOrdersWorkspaceState() {
     updateCanvasesOrdered,
     updateArtworkPreparation,
     updateOrderDetails,
-    updateImageDescription,
+    updateImageDetails,
     deleteOrder,
     deleteImage,
     uploadImagesToFolder,

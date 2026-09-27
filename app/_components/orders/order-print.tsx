@@ -52,7 +52,7 @@ export function OrderPrintButton({ order }: { order: Order }) {
       await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
       if (controller.signal.aborted) return;
       if (originalTitle.current === null) originalTitle.current = document.title;
-      document.title = `Pedido ${order.code} - ${order.clientName}`;
+      document.title = order.clientName;
       window.print();
     } catch {
       if (controller.signal.aborted) return;
@@ -90,7 +90,7 @@ function OrderPrintContent({ order }: { order: Order }) {
   return (
     <>
       <header className="order-print-header">
-        <div><strong>MAVA · PEDIDOS</strong><h1>Pedido {order.code}</h1><p>{order.clientName}</p></div>
+        <div><strong>MAVA · PEDIDOS</strong><h1>{order.clientName}</h1><p>Pedido {order.code}</p></div>
         <div><p>{new Intl.DateTimeFormat("es-AR", { dateStyle: "short", timeStyle: "short" }).format(new Date(order.createdAt))}</p><strong>{order.status}</strong></div>
       </header>
       <dl className="order-print-details">
@@ -120,10 +120,10 @@ function OrderPrintContent({ order }: { order: Order }) {
       {!!order.images.length && (
         <section>
           <h2>Imágenes agregadas · {order.images.length} archivos</h2>
-          {order.images.map((image) => (
+          {order.images.map((image, index) => (
             <figure className="order-print-artwork" key={image.id}>
-              <PrintImage src={image.previewUrl} alt={image.name} />
-              <figcaption><strong>{image.name}</strong><p className="order-print-notes">{image.description}</p><p>Preparación: {image.preparationStatus}</p></figcaption>
+              <PrintImage src={image.previewUrl} alt={image.title || `Imagen ${index + 1}`} />
+              <figcaption><strong>{image.title || `Imagen ${index + 1}`}</strong><p className="order-print-notes">{image.description}</p><p>Preparación: {image.preparationStatus}</p></figcaption>
             </figure>
           ))}
         </section>

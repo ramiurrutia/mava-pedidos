@@ -1,10 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import Lightbox from "yet-another-react-lightbox";
 import Zoom from "yet-another-react-lightbox/plugins/zoom";
 import "yet-another-react-lightbox/styles.css";
-import type { ArtworkPreparationStatus, OrderImage } from "../../../lib/orders";
+import type { ArtworkPreparationStatus, ImageDetails, OrderImage } from "../../../lib/orders";
 import { EditIcon, SaveIcon, SpinnerIcon } from "../icons";
 
 export type ArtworkViewerEntry = {
@@ -15,26 +15,30 @@ export type ArtworkViewerEntry = {
 export function ArtworkLightbox({
   entries,
   initialIndex,
+  initialEditing = false,
   orderCode,
   onClose,
-  onEditDescription,
+  onEditDetails,
   onPreparationChange,
 }: {
   entries: ArtworkViewerEntry[];
   initialIndex: number;
+  initialEditing?: boolean;
   orderCode: string;
   onClose: () => void;
-  onEditDescription: (imageId: string, description: string) => Promise<string | null>;
+  onEditDetails: (imageId: string, details: ImageDetails) => Promise<ImageDetails | null>;
   onPreparationChange: (artworkKey: string, status: ArtworkPreparationStatus) => Promise<boolean>;
 }) {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
-  const [editingDescription, setEditingDescription] = useState(false);
+  const [editingDescription, setEditingDescription] = useState(initialEditing);
   const [descriptionDraft, setDescriptionDraft] = useState(entries[initialIndex]?.image.description ?? "");
+  const [titleDraft, setTitleDraft] = useState(entries[initialIndex]?.image.title ?? "");
+  const currentImageId = useRef(entries[initialIndex]?.image.id);
   const [savingDescription, setSavingDescription] = useState(false);
   const [savingPreparation, setSavingPreparation] = useState(false);
   const entry = entries[currentIndex] ?? entries[0];
   const slides = useMemo(
-    () => entries.map(({ image }) => ({ alt: image.name, src: image.previewUrl ?? "" })),
+    () => entries.map(({ image }, index) => ({ alt: image.title || `Imagen ${index + 1}`, src: image.previewUrl ?? "" })),
     [entries],
   );
 
@@ -43,8 +47,11 @@ export function ArtworkLightbox({
   function showImage(index: number) {
     const nextEntry = entries[index];
     if (!nextEntry) return;
+    if (currentImageId.current === nextEntry.image.id) return;
+    currentImageId.current = nextEntry.image.id;
     setCurrentIndex(index);
     setDescriptionDraft(nextEntry.image.description);
+    setTitleDraft(nextEntry.image.title ?? "");
     setEditingDescription(false);
   }
 
@@ -52,10 +59,12 @@ export function ArtworkLightbox({
     event.preventDefault();
     if (!entry.editable || savingDescription) return;
     setSavingDescription(true);
-    const saved = await onEditDescription(entry.image.id, descriptionDraft);
+    const imageId = entry.image.id;
+    const saved = await onEditDetails(imageId, { title: titleDraft, description: descriptionDraft });
     setSavingDescription(false);
-    if (saved === null) return;
-    setDescriptionDraft(saved);
+    if (saved === null || currentImageId.current !== imageId) return;
+    setDescriptionDraft(saved.description);
+    setTitleDraft(saved.title);
     setEditingDescription(false);
   }
 
@@ -86,10 +95,11 @@ export function ArtworkLightbox({
       open
       plugins={[Zoom]}
       render={{
+        slide: ({ slide }) => !slide.src ? <p className="text-sm text-white/70">Vista previa no disponible</p> : undefined,
         controls: () => (
           <>
             <div className="pointer-events-none absolute inset-x-0 top-0 z-10 min-h-16 border-b border-white/10 bg-[#111715]/90 px-4 pb-3 pr-16 pt-[calc(.75rem+env(safe-area-inset-top))] text-white backdrop-blur-md">
-              <strong className="block max-w-[70vw] truncate text-sm font-semibold">{entry.image.name}</strong>
+              <strong className="block max-w-[70vw] truncate text-sm font-semibold">{entry.image.title || (entry.editable ? `Imagen ${currentIndex + 1}` : entry.image.name)}</strong>
               <span className="mt-1 block text-[10px] text-white/55">{orderCode} · {currentIndex + 1} de {entries.length}</span>
             </div>
 
@@ -124,12 +134,23 @@ export function ArtworkLightbox({
                 <div className="border-t border-white/10 pt-3">
                   {editingDescription ? (
                     <form className="grid gap-3" onSubmit={saveDescription}>
+                      <label className="text-[9px] font-bold uppercase tracking-[.12em] text-white/45" htmlFor="lightbox-image-title">Título de la imagen</label>
+                      <input
+                        autoFocus
+                        className="min-h-11 w-full rounded-lg border border-white/15 bg-white/10 p-3 text-sm text-white outline-none placeholder:text-white/35 focus:border-white/40"
+                        disabled={savingDescription}
+                        id="lightbox-image-title"
+                        maxLength={120}
+                        onChange={(event) => setTitleDraft(event.target.value)}
+                        placeholder="Tamaño del cuadro, medida..."
+                        value={titleDraft}
+                      />
                       <div className="flex items-center justify-between gap-3">
                         <label className="text-[9px] font-bold uppercase tracking-[.12em] text-white/45" htmlFor="lightbox-image-description">Descripción</label>
                         <small className="text-[9px] text-white/45">{descriptionDraft.length}/1000</small>
                       </div>
                       <textarea
-                        autoFocus
+                        disabled={savingDescription}
                         className="min-h-20 w-full resize-y rounded-lg border border-white/15 bg-white/10 p-3 text-sm leading-relaxed text-white outline-none placeholder:text-white/35 focus:border-white/40"
                         id="lightbox-image-description"
                         maxLength={1000}
@@ -143,6 +164,7 @@ export function ArtworkLightbox({
                           disabled={savingDescription}
                           onClick={() => {
                             setDescriptionDraft(entry.image.description);
+                            setTitleDraft(entry.image.title ?? "");
                             setEditingDescription(false);
                           }}
                           type="button"
@@ -157,13 +179,14 @@ export function ArtworkLightbox({
                   ) : (
                     <div>
                       <div className="flex items-center justify-between gap-3">
-                        <span className="text-[9px] font-bold uppercase tracking-[.12em] text-white/45">{entry.editable ? "Descripción" : "Detalles del cuadro"}</span>
+                        <span className="text-[9px] font-bold uppercase tracking-[.12em] text-white/45">{entry.editable ? "Título y descripción" : "Detalles del cuadro"}</span>
                         {entry.editable && (
-                          <button className="inline-flex min-h-9 items-center gap-2 rounded-lg bg-white/10 px-3 text-[10px] font-semibold text-white transition hover:bg-white/20" onClick={() => setEditingDescription(true)} type="button">
+                          <button className="inline-flex min-h-9 items-center gap-2 rounded-lg bg-white/10 px-3 text-[10px] font-semibold text-white transition hover:bg-white/20" disabled={savingDescription} onClick={() => { setTitleDraft(entry.image.title ?? ""); setDescriptionDraft(entry.image.description); setEditingDescription(true); }} type="button">
                             <EditIcon /> Editar
                           </button>
                         )}
                       </div>
+                      {entry.editable && <p className="mt-2 text-sm font-semibold text-white">{entry.image.title || "Sin título"}</p>}
                       <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-white/90">{entry.image.description || "Sin descripción para esta imagen."}</p>
                     </div>
                   )}

@@ -11,6 +11,7 @@ import {
   type ArtworkPreparationStatus,
   type Order,
   type OrderImage,
+  type ImageDetails,
   type OrderStatus,
   type PendingImageUpload,
 } from "../../../lib/orders";
@@ -31,7 +32,7 @@ export function OrderPage({
   onStatusChange,
   onAddImages,
   onEdit,
-  onEditImageDescription,
+  onEditImageDetails,
   onDeleteImage,
   onCanvasesOrderedChange,
   onArtworkPreparationChange,
@@ -42,7 +43,7 @@ export function OrderPage({
   onStatusChange: (status: OrderStatus) => void;
   onAddImages: (uploads: PendingImageUpload[]) => Promise<boolean>;
   onEdit: (input: OrderDetailsInput) => Promise<boolean>;
-  onEditImageDescription: (imageId: string, description: string) => Promise<string | null>;
+  onEditImageDetails: (imageId: string, details: ImageDetails) => Promise<ImageDetails | null>;
   onDeleteImage: (imageId: string) => Promise<boolean>;
   onCanvasesOrderedChange: (value: boolean) => Promise<boolean>;
   onArtworkPreparationChange: (artworkKey: string, status: ArtworkPreparationStatus) => Promise<boolean>;
@@ -59,12 +60,12 @@ export function OrderPage({
   const [actionsOpen, setActionsOpen] = useState(false);
   const [updatingArtworkKeys, setUpdatingArtworkKeys] = useState<Set<string>>(() => new Set());
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
+  const [viewerEditing, setViewerEditing] = useState(false);
   const [imageToDelete, setImageToDelete] = useState<OrderImage | null>(null);
   const canAddImages = isOrderActive(order.status);
   const artworkProgress = getOrderArtworkProgress(order);
   const viewerEntries: ArtworkViewerEntry[] = [
     ...order.images
-      .filter((image) => Boolean(image.previewUrl))
       .map((image) => ({ editable: true, image })),
     ...(order.items ?? []).flatMap((item, index) => {
       const image = createStockViewerImage(order, item, index);
@@ -128,11 +129,12 @@ export function OrderPage({
     if (fileInput.current) fileInput.current.value = "";
   }
 
-  function openImageViewer(imageId: string) {
+  function openImageViewer(imageId: string, editDetails = false) {
     const index = viewerEntries.findIndex(({ image }) => image.id === imageId);
     if (index < 0) return;
     window.history.pushState({ ...window.history.state, mavaImageViewer: true }, "");
     setViewerIndex(index);
+    setViewerEditing(editDetails);
   }
 
   function openStockItemImage(item: NonNullable<Order["items"]>[number], index: number) {
@@ -377,9 +379,11 @@ export function OrderPage({
                     {updatingArtworkKeys.has(image.preparationKey) ? <SpinnerIcon className="animate-spin" /> : <CheckIcon />}
                   </button>
                   {!image.previewUrl && <ImageIcon />}
-                  <small>{image.description || image.name}</small>
+                  <small>{image.title || `Imagen ${index + 1}`}</small>
                   <time dateTime={image.addedAt}>{new Intl.DateTimeFormat("es-AR", { dateStyle: "short", timeStyle: "short" }).format(new Date(image.addedAt))}</time>
                 </div>
+                {image.description && <p className="px-1 text-xs whitespace-pre-wrap text-[#68736d]">{image.description}</p>}
+                <button className={`${ui.textButton} justify-self-start px-2`} onClick={() => openImageViewer(image.id, true)} type="button"><EditIcon />Título y descripción</button>
                 <button aria-label={`Eliminar imagen ${image.name}`} className={`${ui.textButton} justify-self-end px-2 text-[#a34e42] hover:bg-[#fff0ed]`} disabled={deleting || updatingArtworkKeys.has(image.preparationKey)} onClick={() => setImageToDelete(image)} type="button"><TrashIcon />Eliminar imagen</button>
                 </div>
               ))}
@@ -394,8 +398,9 @@ export function OrderPage({
         <ArtworkLightbox
           entries={viewerEntries}
           initialIndex={viewerIndex}
+          initialEditing={viewerEditing}
           onClose={closeImageViewer}
-          onEditDescription={onEditImageDescription}
+          onEditDetails={onEditImageDetails}
           onPreparationChange={onArtworkPreparationChange}
           orderCode={order.code}
         />
