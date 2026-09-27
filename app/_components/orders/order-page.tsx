@@ -170,15 +170,18 @@ export function OrderPage({
     setSavingCanvasesOrdered(false);
   }
 
-  async function toggleArtworkPreparation(artworkKey: string, currentStatus: ArtworkPreparationStatus) {
+  async function changeArtworkPreparation(artworkKey: string, status: ArtworkPreparationStatus) {
     if (updatingArtworkKeys.has(artworkKey)) return;
     setUpdatingArtworkKeys((current) => new Set(current).add(artworkKey));
-    await onArtworkPreparationChange(artworkKey, currentStatus === "Listo" ? "Pendiente" : "Listo");
-    setUpdatingArtworkKeys((current) => {
-      const next = new Set(current);
-      next.delete(artworkKey);
-      return next;
-    });
+    try {
+      await onArtworkPreparationChange(artworkKey, status);
+    } finally {
+      setUpdatingArtworkKeys((current) => {
+        const next = new Set(current);
+        next.delete(artworkKey);
+        return next;
+      });
+    }
   }
 
   return (
@@ -332,7 +335,7 @@ export function OrderPage({
                         aria-label={item.preparationStatus === "Listo" ? `Marcar ${item.code} como pendiente` : `Marcar ${item.code} como listo`}
                         className={`${preparationStyle(item.preparationStatus ?? "Pendiente")} mt-2 inline-flex min-h-8 items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-semibold`}
                         disabled={updatingArtworkKeys.has(item.preparationKey ?? `stock:${item.id}:${index}`)}
-                        onClick={() => void toggleArtworkPreparation(item.preparationKey ?? `stock:${item.id}:${index}`, item.preparationStatus ?? "Pendiente")}
+                        onClick={() => void changeArtworkPreparation(item.preparationKey ?? `stock:${item.id}:${index}`, item.preparationStatus === "Listo" ? "Pendiente" : "Listo")}
                         type="button"
                       >
                         {updatingArtworkKeys.has(item.preparationKey ?? `stock:${item.id}:${index}`) ? <SpinnerIcon className="animate-spin" /> : <CheckIcon />}
@@ -353,42 +356,70 @@ export function OrderPage({
           )}
           <div className={`${ui.detailBlock} order-5`}>
             <div className={ui.detailTitle}><span>Imágenes agregadas</span><small>{order.images.length} archivos</small></div>
-            <div className={ui.imageGrid}>
+            <ul aria-label="Imágenes del pedido" className="divide-y divide-[#e7e9e6] overflow-hidden rounded-lg border border-[#e4e7e3] bg-white">
               {order.images.map((image, index) => (
-                <div className="grid min-w-0 gap-1" key={image.id}>
-                <div
-                  className={`${ui.imageTile} ${image.previewUrl ? ui.imagePreview : ""} relative overflow-hidden border-0 text-left transition-transform hover:scale-[1.015]`}
-                  style={image.previewUrl ? { backgroundImage: `url("${image.previewUrl}")` } : index === 0 ? { background: order.cover } : undefined}
-                >
-                  <button
-                    aria-label={`Abrir ${image.name}`}
-                    className="absolute inset-0 z-[5] cursor-pointer rounded-lg focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-white"
-                    disabled={!image.previewUrl}
-                    onClick={() => openImageViewer(image.id)}
-                    type="button"
-                  />
-                  <span className={`${preparationStyle(image.preparationStatus)} absolute left-2 top-2 z-10 rounded-full px-2.5 py-1.5 text-[10px] font-semibold shadow-sm`}>{image.preparationStatus}</span>
-                  <button
-                    aria-label={image.preparationStatus === "Listo" ? `Marcar ${image.name} como pendiente` : `Marcar ${image.name} como listo`}
-                    className={`${image.preparationStatus === "Listo" ? "border-[#3f765f] bg-[#3f765f] text-white" : "border-white/80 bg-black/55 text-white"} absolute right-2 top-2 z-20 grid size-10 place-items-center rounded-full border shadow-md backdrop-blur-sm transition-transform hover:scale-105 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white [&_svg]:size-4`}
-                    disabled={updatingArtworkKeys.has(image.preparationKey)}
-                    onClick={() => void toggleArtworkPreparation(image.preparationKey, image.preparationStatus)}
-                    title={image.preparationStatus === "Listo" ? "Marcar como pendiente" : "Marcar como listo"}
-                    type="button"
-                  >
-                    {updatingArtworkKeys.has(image.preparationKey) ? <SpinnerIcon className="animate-spin" /> : <CheckIcon />}
-                  </button>
-                  {!image.previewUrl && <ImageIcon />}
-                  <small>{image.title || `Imagen ${index + 1}`}</small>
-                  <time dateTime={image.addedAt}>{new Intl.DateTimeFormat("es-AR", { dateStyle: "short", timeStyle: "short" }).format(new Date(image.addedAt))}</time>
-                </div>
-                {image.description && <p className="px-1 text-xs whitespace-pre-wrap text-[#68736d]">{image.description}</p>}
-                <button className={`${ui.textButton} justify-self-start px-2`} onClick={() => openImageViewer(image.id, true)} type="button"><EditIcon />Título y descripción</button>
-                <button aria-label={`Eliminar imagen ${image.name}`} className={`${ui.textButton} justify-self-end px-2 text-[#a34e42] hover:bg-[#fff0ed]`} disabled={deleting || updatingArtworkKeys.has(image.preparationKey)} onClick={() => setImageToDelete(image)} type="button"><TrashIcon />Eliminar imagen</button>
-                </div>
+                <li className="min-w-0 p-3 sm:p-4" key={image.id}>
+                  <div className="flex items-start gap-3">
+                    <button
+                      aria-label={`Abrir ${image.title || image.name}`}
+                      className="grid size-20 shrink-0 place-items-center overflow-hidden rounded-lg border border-[#e1e5e1] bg-[#f5f7f5] bg-contain bg-center bg-no-repeat text-[#87908c] transition-colors hover:border-[#8fa79c] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#235c4c] disabled:cursor-default [&_svg]:size-6 sm:size-24"
+                      disabled={!image.previewUrl}
+                      onClick={() => openImageViewer(image.id)}
+                      style={image.previewUrl ? { backgroundImage: `url("${image.previewUrl}")` } : undefined}
+                      type="button"
+                    >
+                      {!image.previewUrl && <ImageIcon />}
+                    </button>
+                    <div className="min-w-0 flex-1">
+                      <h3 className="text-sm font-semibold text-[#29352f] [overflow-wrap:anywhere]">{image.title || `Imagen ${index + 1}`}</h3>
+                      <p className="mt-1 text-xs leading-relaxed text-[#68736d] [overflow-wrap:anywhere]"><span className="font-medium">Archivo: </span>{image.name}</p>
+                      {image.description && <p className="mt-2 whitespace-pre-wrap text-xs leading-relaxed text-[#48564e] [overflow-wrap:anywhere]">{image.description}</p>}
+                      <time className="mt-2 block text-[10px] text-[#7b8580]" dateTime={image.addedAt}>{new Intl.DateTimeFormat("es-AR", { dateStyle: "short", timeStyle: "short" }).format(new Date(image.addedAt))}</time>
+                    </div>
+                  </div>
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <button
+                      aria-label={`Editar título y descripción de ${image.title || image.name}`}
+                      className={ui.secondaryButton}
+                      onClick={() => openImageViewer(image.id, true)}
+                      type="button"
+                    ><EditIcon />Título y descripción</button>
+                    <button
+                      aria-label={`Imagen lista: ${image.title || image.name}`}
+                      aria-pressed={image.preparationStatus === "Listo"}
+                      aria-busy={updatingArtworkKeys.has(image.preparationKey)}
+                      className={`${image.preparationStatus === "Listo" ? "border-[#a8cbb6] bg-[#edf7f0] text-[#276146] hover:border-[#6caa86] hover:bg-[#e1f0e6]" : "border-[#dfc9a2] bg-[#fff9ed] text-[#875d21] hover:border-[#c39b5e] hover:bg-[#fff1d7]"} inline-flex min-h-12 cursor-pointer items-center gap-2.5 rounded-xl border px-3 py-2 text-left shadow-sm transition motion-safe:active:scale-[.98] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#235c4c] disabled:cursor-wait disabled:opacity-60`}
+                      disabled={updatingArtworkKeys.has(image.preparationKey)}
+                      onClick={() => void changeArtworkPreparation(image.preparationKey, image.preparationStatus === "Listo" ? "Pendiente" : "Listo")}
+                      type="button"
+                    >
+                      <span aria-hidden="true" className={`${image.preparationStatus === "Listo" ? "bg-[#d1e9da]" : "bg-[#f6e6c5]"} grid size-7 shrink-0 place-items-center rounded-full [&_svg]:size-4`}>
+                        {updatingArtworkKeys.has(image.preparationKey) ? <SpinnerIcon className="animate-spin" /> : image.preparationStatus === "Listo" ? <CheckIcon /> : <span className="size-2 rounded-full bg-current" />}
+                      </span>
+                      <span aria-live="polite">
+                        <strong className="block text-xs font-semibold leading-tight">{image.preparationStatus}</strong>
+                        <span className="mt-0.5 block text-[10px] leading-tight">{updatingArtworkKeys.has(image.preparationKey) ? "Guardando…" : image.preparationStatus === "Listo" ? "Volver a pendiente" : "Marcar listo"}</span>
+                      </span>
+                    </button>
+                    <button
+                      aria-label={`Eliminar imagen ${image.title || image.name}`}
+                      aria-haspopup="dialog"
+                      className="ml-auto inline-flex min-h-12 cursor-pointer items-center gap-2.5 rounded-xl border border-[#e5bcb5] bg-[#fff3f0] px-3 py-2 text-left text-[#a34e42] shadow-sm transition hover:border-[#ce8d81] hover:bg-[#ffe6e0] motion-safe:active:scale-[.98] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#a34e42] disabled:cursor-not-allowed disabled:opacity-60"
+                      disabled={deleting || updatingArtworkKeys.has(image.preparationKey)}
+                      onClick={() => setImageToDelete(image)}
+                      type="button"
+                    >
+                      <span aria-hidden="true" className="grid size-7 shrink-0 place-items-center rounded-full bg-[#f7dcd5] [&_svg]:size-4"><TrashIcon /></span>
+                      <span>
+                        <strong className="block text-xs font-semibold leading-tight">Eliminar imagen</strong>
+                        <span className="mt-0.5 block text-[10px] leading-tight">Quitar del pedido</span>
+                      </span>
+                    </button>
+                  </div>
+                </li>
               ))}
-              {!order.images.length && <div className={ui.detailEmpty}>Todavía no hay imágenes.</div>}
-            </div>
+              {!order.images.length && <li className={ui.detailEmpty}>Todavía no hay imágenes.</li>}
+            </ul>
           </div>
         </div>
       </div>
