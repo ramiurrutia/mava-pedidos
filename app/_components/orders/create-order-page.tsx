@@ -23,6 +23,7 @@ export function CreateOrderPage({
   onCreate,
   onAssignExisting,
   onOpenOrder,
+  initialUploads = [],
 }: {
   folders: ClientFolder[];
   orders: Order[];
@@ -30,12 +31,13 @@ export function CreateOrderPage({
   onCreate: (input: { clientName: string; locality: string; notes: string; canvasesOrdered: boolean; uploads: PendingImageUpload[] }) => Promise<string | null>;
   onAssignExisting: (clientId: string, uploads: PendingImageUpload[], orderId?: string) => Promise<boolean>;
   onOpenOrder: (orderId: string) => void;
+  initialUploads?: PendingImageUpload[];
 }) {
   const [clientName, setClientName] = useState("");
   const [notes, setNotes] = useState("");
   const [locality, setLocality] = useState("");
   const [canvasesOrdered, setCanvasesOrdered] = useState(false);
-  const [uploads, setUploads] = useState<PendingImageUpload[]>([]);
+  const [uploads, setUploads] = useState<PendingImageUpload[]>(initialUploads);
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [assignment, setAssignment] = useState<"new" | "existing">("new");
   const [selectedOrderId, setSelectedOrderId] = useState("");

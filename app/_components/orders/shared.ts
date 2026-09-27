@@ -1,6 +1,6 @@
 import type { OrderStatus } from "../../../lib/orders";
 
-export type DashboardView = "resumen" | "pedidos" | "carpetas" | "nuevo" | "subir" | "pedido" | "carpeta" | "importar-pdf";
+export type DashboardView = "resumen" | "pedidos" | "carpetas" | "nuevo" | "subir" | "pedido" | "carpeta" | "importar-pdf" | "compartir";
 export type WorkspaceView = Extract<DashboardView, "resumen" | "pedidos" | "carpetas">;
 export type DataSource = "loading" | "supabase" | "error";
 

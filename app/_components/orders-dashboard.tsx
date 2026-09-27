@@ -20,6 +20,7 @@ import { useOrdersWorkspace } from "./orders/use-orders-workspace";
 import { WorkspacePage } from "./orders/workspace-page";
 import { OrderDragProvider } from "./orders/order-drag-provider";
 import { ImportPdfPage } from "./orders/import-pdf-page";
+import { SharedImagesPage } from "./orders/shared-images-page";
 
 export function OrdersDashboard({
   view = "resumen",
@@ -70,6 +71,8 @@ export function OrdersDashboard({
         />
       ) : workspace.dataSource === "loading" ? (
         <LoadingPage />
+      ) : view === "compartir" ? (
+        <SharedImagesPage />
       ) : view === "importar-pdf" ? (
         <ImportPdfPage />
       ) : view === "nuevo" ? (
@@ -127,7 +130,7 @@ function isWorkspaceView(view: DashboardView): view is WorkspaceView {
 }
 
 function getActiveNavigationView(view: DashboardView): WorkspaceView {
-  if (view === "pedido" || view === "nuevo" || view === "importar-pdf") return "pedidos";
+  if (view === "pedido" || view === "nuevo" || view === "importar-pdf" || view === "compartir") return "pedidos";
   if (view === "carpeta") return "carpetas";
   if (view === "subir") return "resumen";
   return view;

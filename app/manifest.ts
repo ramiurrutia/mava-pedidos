@@ -14,6 +14,12 @@ export default function manifest(): MetadataRoute.Manifest {
     orientation: "portrait-primary",
     lang: "es-AR",
     categories: ["business", "productivity"],
+    share_target: {
+      action: "/compartir/recibir",
+      method: "POST",
+      enctype: "multipart/form-data",
+      params: { files: [{ name: "images", accept: ["image/*"] }] },
+    },
     icons: [
       {
         src: "/icon-192.png",

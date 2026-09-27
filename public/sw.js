@@ -1,4 +1,7 @@
-const VERSION = "mava-pwa-v2";
+const VERSION = "mava-pwa-v3";
+// Separate from the versioned app caches: an update must not remove pending photos.
+const SHARE_CACHE = "mava-shared-images-v1";
+const SHARE_TTL = 24 * 60 * 60 * 1000;
 const STATIC_CACHE = `${VERSION}-static`;
 const PAGE_CACHE = `${VERSION}-pages`;
 const OFFLINE_URL = "/offline";
@@ -34,6 +37,11 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   const { request } = event;
   const url = new URL(request.url);
+
+  if (request.method === "POST" && url.origin === self.location.origin && url.pathname === "/compartir/recibir") {
+    event.respondWith(receiveSharedImages(request));
+    return;
+  }
 
   if (request.method !== "GET" || url.origin !== self.location.origin || url.pathname.startsWith("/api/")) {
     return;
@@ -73,6 +81,34 @@ self.addEventListener("fetch", (event) => {
     );
   }
 });
+
+async function receiveSharedImages(request) {
+  const redirect = (query) => Response.redirect(new URL(`/compartir?${query}`, self.location.origin).href, 303);
+  try {
+    const form = await request.formData();
+    const files = form.getAll("images");
+    if (!files.length || files.some((file) => typeof file === "string" || !file.type.startsWith("image/") || !file.size)) {
+      return redirect("error=images");
+    }
+    if (files.length > 30 || files.some((file) => file.size > 6 * 1024 * 1024)) {
+      return redirect("error=size");
+    }
+    const cache = await caches.open(SHARE_CACHE);
+    for (const key of await cache.keys()) {
+      const entry = await cache.match(key);
+      if (Number(entry?.headers.get("x-share-created")) < Date.now() - SHARE_TTL) await cache.delete(key);
+    }
+    const id = crypto.randomUUID();
+    const payload = new FormData();
+    for (const file of files) payload.append("images", file, file.name);
+    await cache.put(new URL(`/compartir/archivo/${id}`, self.location.origin).href, new Response(payload, {
+      headers: { "x-share-created": String(Date.now()) },
+    }));
+    return redirect(`share=${id}`);
+  } catch {
+    return redirect("error=storage");
+  }
+}
 
 self.addEventListener("push", (event) => {
   let payload = {};
