@@ -15,6 +15,11 @@ import { useOrdersWorkspace } from "./use-orders-workspace";
 
 const errors: Record<string, string> = {
   images: "No recibimos imágenes válidas. Seleccioná las fotos en WhatsApp y volvé a compartirlas.",
+  missing: "El envío llegó sin archivos adjuntos. Abrí la foto, esperá a que se descargue y volvé a compartirla con MAVA Pedidos.",
+  empty: "Una de las imágenes llegó vacía. Esperá a que termine de descargarse y volvé a compartirla.",
+  format: "Uno de los archivos no se reconoce como JPG, PNG, WebP o GIF. Compartí las imágenes en uno de esos formatos.",
+  payload: "No pudimos leer el envío compartido. Cerrá y abrí MAVA Pedidos con conexión, y volvé a compartir la foto.",
+  unreadable: "No pudimos leer una de las imágenes. Guardala en el dispositivo y volvé a compartirla desde la galería.",
   size: "Podés compartir hasta 30 imágenes por vez, de hasta 6 MB cada una. Volvé a seleccionar las fotos.",
   storage: "No pudimos guardar las fotos en este dispositivo. Revisá el espacio disponible y volvé a compartirlas.",
   worker: "La app necesita actualizarse. Cerrala, abrila con conexión y volvé a compartir las imágenes.",

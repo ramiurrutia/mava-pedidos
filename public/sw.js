@@ -1,4 +1,4 @@
-const VERSION = "mava-pwa-v3";
+const VERSION = "mava-pwa-v4";
 // Separate from the versioned app caches: an update must not remove pending photos.
 const SHARE_CACHE = "mava-shared-images-v1";
 const SHARE_TTL = 24 * 60 * 60 * 1000;
@@ -84,15 +84,33 @@ self.addEventListener("fetch", (event) => {
 
 async function receiveSharedImages(request) {
   const redirect = (query) => Response.redirect(new URL(`/compartir?${query}`, self.location.origin).href, 303);
+  let form;
   try {
-    const form = await request.formData();
-    const files = form.getAll("images");
-    if (!files.length || files.some((file) => typeof file === "string" || !file.type.startsWith("image/") || !file.size)) {
-      return redirect("error=images");
+    form = await request.formData();
+  } catch {
+    return redirect("error=payload");
+  }
+  // Read file parts regardless of their field name; accompanying text is not a file.
+  const received = [...form.values()].filter((value) => typeof value !== "string");
+  if (!received.length) return redirect("error=missing");
+  if (received.some((file) => !file.size)) return redirect("error=empty");
+  if (received.length > 30 || received.some((file) => file.size > 6 * 1024 * 1024)) {
+    return redirect("error=size");
+  }
+  const files = [];
+  try {
+    for (const [index, file] of received.entries()) {
+      const type = await sharedImageType(file);
+      if (!type) return redirect("error=format");
+      files.push(new File([file], file.name || `imagen-${index + 1}.${type === "image/jpeg" ? "jpg" : type.split("/")[1]}`, {
+        type,
+        lastModified: file.lastModified,
+      }));
     }
-    if (files.length > 30 || files.some((file) => file.size > 6 * 1024 * 1024)) {
-      return redirect("error=size");
-    }
+  } catch {
+    return redirect("error=unreadable");
+  }
+  try {
     const cache = await caches.open(SHARE_CACHE);
     for (const key of await cache.keys()) {
       const entry = await cache.match(key);
@@ -108,6 +126,18 @@ async function receiveSharedImages(request) {
   } catch {
     return redirect("error=storage");
   }
+}
+
+// Identify the formats accepted by Supabase using a small header, not the
+// filename or MIME supplied by the sending app (which can be empty/generic).
+async function sharedImageType(file) {
+  const bytes = new Uint8Array(await file.slice(0, 12).arrayBuffer());
+  const matches = (signature, offset = 0) => signature.every((byte, index) => bytes[offset + index] === byte);
+  if (matches([0xff, 0xd8, 0xff])) return "image/jpeg";
+  if (matches([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])) return "image/png";
+  if (matches([0x47, 0x49, 0x46, 0x38, 0x37, 0x61]) || matches([0x47, 0x49, 0x46, 0x38, 0x39, 0x61])) return "image/gif";
+  if (matches([0x52, 0x49, 0x46, 0x46]) && matches([0x57, 0x45, 0x42, 0x50], 8)) return "image/webp";
+  return null;
 }
 
 self.addEventListener("push", (event) => {
