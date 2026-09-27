@@ -4,6 +4,10 @@ La PWA declara `share_target` en `/manifest.webmanifest`. Android/Chrome puede m
 
 Después de publicar la actualización, abrir la PWA con conexión para actualizar el service worker. La actualización del manifiesto de una instalación existente puede demorarse; si MAVA no aparece como destino, desinstalar y volver a instalar la PWA desde Chrome.
 
+La recepción declara tipos MIME, extensiones y `application/octet-stream` para permitir fotos identificadas como archivos genéricos. El service worker identifica JPG, PNG, WebP y GIF por su cabecera y rechaza los demás formatos antes de guardarlos. Los límites de tamaño y cantidad se mantienen.
+
+Si aparece «El navegador abrió MAVA Pedidos, pero no entregó ningún archivo», el POST llegó sin partes de archivo: no es un rechazo por formato de la foto. Tras publicar un cambio de `share_target`, actualizar el navegador y reinstalar la PWA permite probar con el registro nuevo del sistema; actualizar únicamente el service worker no garantiza actualizar ese registro. Si sigue ocurriendo, registrar teléfono, navegador y versión para investigar la entrega del archivo. La pantalla ofrece un selector local que envía las imágenes al mismo receptor y permite continuar con las dos acciones habituales. Esta alternativa no demuestra que el menú Compartir del sistema esté reparado.
+
 ## Flujo
 
 1. En WhatsApp, seleccionar una o varias fotos y usar **Compartir**.

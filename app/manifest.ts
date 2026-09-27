@@ -18,7 +18,17 @@ export default function manifest(): MetadataRoute.Manifest {
       action: "/compartir/recibir",
       method: "POST",
       enctype: "multipart/form-data",
-      params: { files: [{ name: "images", accept: ["image/*"] }] },
+      params: {
+        files: [{
+          name: "images",
+          // Android can filter attachments before sw.js receives the POST.
+          // Generic files are checked by their content in the service worker.
+          accept: [
+            "image/*", "image/jpeg", "image/png", "image/webp", "image/gif",
+            "application/octet-stream", ".jpg", ".jpeg", ".png", ".webp", ".gif",
+          ],
+        }],
+      },
     },
     icons: [
       {

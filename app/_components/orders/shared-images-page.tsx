@@ -15,7 +15,7 @@ import { useOrdersWorkspace } from "./use-orders-workspace";
 
 const errors: Record<string, string> = {
   images: "No recibimos imágenes válidas. Seleccioná las fotos en WhatsApp y volvé a compartirlas.",
-  missing: "El envío llegó sin archivos adjuntos. Abrí la foto, esperá a que se descargue y volvé a compartirla con MAVA Pedidos.",
+  missing: "El navegador abrió MAVA Pedidos, pero no entregó ningún archivo. Podés seleccionar la foto abajo para continuar.",
   empty: "Una de las imágenes llegó vacía. Esperá a que termine de descargarse y volvé a compartirla.",
   format: "Uno de los archivos no se reconoce como JPG, PNG, WebP o GIF. Compartí las imágenes en uno de esos formatos.",
   payload: "No pudimos leer el envío compartido. Cerrá y abrí MAVA Pedidos con conexión, y volvé a compartir la foto.",
@@ -159,6 +159,15 @@ function SharedImagesFlow({ id, receiveError }: { id: string; receiveError: stri
       <div className={ui.pageCard}>
         <div className={ui.pageHead}><div><p className={ui.eyebrow}>Imágenes compartidas</p><h2 id="shared-images-title">{mode === "existing" ? "Subir imagen a pedido" : "¿Qué querés hacer con las imágenes?"}</h2></div></div>
         {(initialError || error) && <p className="mb-4 text-sm text-[#a34e42]" role="alert">{initialError || error}</p>}
+        {receiveError && !draft && <form action="/compartir/recibir" method="post" encType="multipart/form-data" className="mb-5 rounded-xl border border-[#dfe3df] bg-[#f8faf8] p-4">
+          <label className={ui.field}>
+            <span>Seleccionar imágenes del dispositivo</span>
+            <input type="file" name="images" accept="image/jpeg,image/png,image/webp,image/gif,.jpg,.jpeg,.png,.webp,.gif" multiple required className="file:mr-3 file:cursor-pointer file:rounded-md file:border-0 file:bg-[#edf3ef] file:px-3 file:py-2 file:text-xs file:font-semibold file:text-[#235c4c]" />
+          </label>
+          <p className="mb-3 text-xs text-[#68726d]">Hasta 30 imágenes, de hasta 6 MB cada una. Después podrás crear un pedido o elegir uno existente.</p>
+          <button className={`${ui.primaryButton} w-full`} type="submit"><UploadIcon />Continuar con estas imágenes</button>
+          {receiveError === "missing" && <p className="mt-3 text-xs leading-relaxed text-[#68726d]">Si compartir sigue fallando, actualizá el navegador y reinstalá MAVA Pedidos desde el sitio actualizado. Podés usar este selector mientras tanto.</p>}
+        </form>}
         {draft && <>
           <p className="mb-4 text-sm text-[#68726d]">{draft.uploads.length} imagen{draft.uploads.length === 1 ? "" : "es"} pendiente{draft.uploads.length === 1 ? "" : "s"}. Se conservarán en este dispositivo por hasta 24 horas.</p>
           {mode === "choose" ? <>
