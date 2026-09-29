@@ -10,12 +10,15 @@ export type OrderImage = {
   id: string;
   pedidoId: string;
   name: string;
+  title?: string;
   description: string;
   preparationKey: string;
   preparationStatus: ArtworkPreparationStatus;
   addedAt: string;
   previewUrl?: string;
 };
+
+export type ImageDetails = { title: string; description: string };
 
 export type PendingImageUpload = {
   file: File;
@@ -24,7 +27,7 @@ export type PendingImageUpload = {
 };
 
 export function createPendingImageUploads(files: File[]): PendingImageUpload[] {
-  return files.map((file) => ({ file, title: file.name, description: "" }));
+  return files.map((file) => ({ file, title: "", description: "" }));
 }
 
 export type OrderItem = {

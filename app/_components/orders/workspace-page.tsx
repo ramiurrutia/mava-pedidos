@@ -557,6 +557,7 @@ function getOrderSearchIndex(order: Order) {
   const imageDetails = order.images.flatMap((image) => [
     image.id,
     image.name,
+    image.title,
     image.description,
     image.preparationStatus,
     image.addedAt,
@@ -613,6 +614,7 @@ function describeOrderMatch(order: Order, query: string) {
     ["Telas", order.canvasesOrdered ? "Pedidas" : "Sin pedir"],
     ...order.images.flatMap((image): Array<[string, string | undefined]> => [
       ["Imagen", image.name],
+      ["Título", image.title],
       ["Descripción", image.description],
       ["Preparación", image.preparationStatus],
     ]),

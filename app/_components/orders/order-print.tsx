@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
-import { getOrderArtworkProgress, type Order } from "../../../lib/orders";
+import type { Order } from "../../../lib/orders";
 import { PrinterIcon, SpinnerIcon } from "../icons";
 import { formatCurrency, ui } from "./shared";
 
@@ -52,7 +52,7 @@ export function OrderPrintButton({ order }: { order: Order }) {
       await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
       if (controller.signal.aborted) return;
       if (originalTitle.current === null) originalTitle.current = document.title;
-      document.title = `Pedido ${order.code} - ${order.clientName}`;
+      document.title = order.clientName;
       window.print();
     } catch {
       if (controller.signal.aborted) return;
@@ -86,12 +86,11 @@ export function OrderPrintButton({ order }: { order: Order }) {
 }
 
 function OrderPrintContent({ order }: { order: Order }) {
-  const progress = getOrderArtworkProgress(order);
   return (
     <>
       <header className="order-print-header">
-        <div><strong>MAVA · PEDIDOS</strong><h1>Pedido {order.code}</h1><p>{order.clientName}</p></div>
-        <div><p>{new Intl.DateTimeFormat("es-AR", { dateStyle: "short", timeStyle: "short" }).format(new Date(order.createdAt))}</p><strong>{order.status}</strong></div>
+        <div><strong>MAVA · PEDIDOS</strong><h1>{order.clientName}</h1><p>Pedido {order.code}</p></div>
+        <div><p>{new Intl.DateTimeFormat("es-AR", { dateStyle: "short", timeStyle: "short" }).format(new Date(order.createdAt))}</p></div>
       </header>
       <dl className="order-print-details">
         {order.contactName && <div><dt>Contacto</dt><dd>{order.contactName}</dd></div>}
@@ -99,18 +98,17 @@ function OrderPrintContent({ order }: { order: Order }) {
         {order.locality && <div><dt>Localidad</dt><dd>{order.locality}</dd></div>}
         {order.folderName && <div><dt>Carpeta</dt><dd>{order.folderName}</dd></div>}
         <div><dt>Telas pedidas</dt><dd>{order.canvasesOrdered ? "Sí" : "No"}</dd></div>
-        <div><dt>Preparación de cuadros</dt><dd>{progress.ready} de {progress.total} listos</dd></div>
       </dl>
       {!!order.items?.length && (
         <section>
           <h2>Cuadros de MAVA STOCK · {order.items.length} unidades</h2>
           <table>
-            <thead><tr><th>Imagen</th><th>Cuadro / detalle</th><th>Estado</th><th>Precio</th></tr></thead>
+            <thead><tr><th>Imagen</th><th>Cuadro / detalle</th><th>Precio</th></tr></thead>
             <tbody>{order.items.map((item, index) => (
               <tr key={`${item.id}-${index}`}>
                 <td><PrintImage src={item.imageUrl} alt={item.code} /></td>
                 <td><strong>{item.code}</strong><p>{item.name}</p><p>{[item.size, item.backgroundLabel].filter(Boolean).join(" · ")}</p></td>
-                <td>{item.preparationStatus ?? "Pendiente"}</td><td className="order-print-price">{formatCurrency(item.price)}</td>
+                <td className="order-print-price">{formatCurrency(item.price)}</td>
               </tr>
             ))}</tbody>
           </table>
@@ -120,10 +118,10 @@ function OrderPrintContent({ order }: { order: Order }) {
       {!!order.images.length && (
         <section>
           <h2>Imágenes agregadas · {order.images.length} archivos</h2>
-          {order.images.map((image) => (
+          {order.images.map((image, index) => (
             <figure className="order-print-artwork" key={image.id}>
-              <PrintImage src={image.previewUrl} alt={image.name} />
-              <figcaption><strong>{image.name}</strong><p className="order-print-notes">{image.description}</p><p>Preparación: {image.preparationStatus}</p></figcaption>
+              <PrintImage src={image.previewUrl} alt={image.title || `Imagen ${index + 1}`} />
+              <figcaption><strong>{image.title || `Imagen ${index + 1}`}</strong><p className="order-print-notes">{image.description}</p></figcaption>
             </figure>
           ))}
         </section>

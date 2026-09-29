@@ -88,6 +88,17 @@
   animation: order-step-enter 320ms cubic-bezier(.22, 1, .36, 1) both;
 }
 
+@keyframes image-delete-confirm {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(.9);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
 @keyframes skeleton-shimmer {
   0% {
     transform: translateX(-110%);

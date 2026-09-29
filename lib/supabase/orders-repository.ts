@@ -1,5 +1,6 @@
 import {
   type ClientFolder,
+  type ImageDetails,
   type ArtworkPreparationStatus,
   type Order,
   type OrderImage,
@@ -18,6 +19,7 @@ type ImageRow = {
   order_id: string;
   storage_key: string;
   original_filename: string;
+  title?: string;
   description: string;
   created_at: string;
   upload_status: "pending" | "ready" | "failed";
@@ -55,6 +57,7 @@ type PreparedImageRow = {
   order_id: string;
   storage_key: string;
   original_filename: string;
+  title?: string;
   description: string;
   created_at: string;
 };
@@ -117,6 +120,7 @@ function createSignedImage(image: ImageRow | PreparedImageRow, previewUrl?: stri
     id: image.id,
     pedidoId: image.order_id,
     name: image.original_filename,
+    title: image.title ?? "",
     description: image.description,
     preparationKey: `image:${image.id}`,
     preparationStatus: "Pendiente",
@@ -154,6 +158,7 @@ export async function loadWorkspace(): Promise<{ folders: ClientFolder[]; orders
           order_id,
           storage_key,
           original_filename,
+          title,
           description,
           created_at,
           upload_status
@@ -338,15 +343,16 @@ export async function updateRemoteOrderDetails(orderId: string, input: OrderDeta
   };
 }
 
-export async function updateRemoteImageDescription(imageId: string, description: string) {
+export async function updateRemoteImageDetails(imageId: string, details: ImageDetails): Promise<ImageDetails> {
   const supabase = createClient();
-  const { data, error } = await supabase.rpc("update_order_image_description", {
+  const { data, error } = await supabase.rpc("update_order_image_details", {
     requested_image_id: imageId,
-    requested_description: description.trim(),
+    requested_title: details.title.trim(),
+    requested_description: details.description.trim(),
   });
   if (error) throw error;
-  if (typeof data !== "string") throw new Error("IMAGE_NOT_FOUND");
-  return data;
+  if (!data || typeof data.title !== "string" || typeof data.description !== "string") throw new Error("IMAGE_NOT_FOUND");
+  return { title: data.title, description: data.description };
 }
 
 export async function deleteRemoteOrder(orderId: string) {
@@ -394,18 +400,21 @@ export async function uploadRemoteImages({
       }
 
       const imageId = crypto.randomUUID();
-      const { data, error } = await supabase.rpc("prepare_order_image", {
+      const { data, error } = await supabase.rpc("prepare_order_image_with_details", {
         requested_client_id: clientId,
         requested_order_id: resolvedOrderId ?? null,
         requested_image_id: imageId,
-        // This metadata is displayed as the image name throughout the order.
-        requested_filename: item.title?.trim() || file.name,
+        requested_filename: file.name,
+        requested_title: item.title?.trim() || "",
         requested_mime_type: file.type,
         requested_size_bytes: file.size,
         requested_description: item.description.trim(),
       });
 
-      if (error) throw error;
+      if (error) {
+        if (error.code === "PGRST202" || error.code === "42883") throw new Error("Falta aplicar la migración 20260929_pending_image_titles.sql en Supabase.");
+        throw error;
+      }
       prepared = normalizeRpcRow(data as PreparedImageRow | PreparedImageRow[] | null);
       resolvedOrderId = prepared.order_id;
 

@@ -1515,6 +1515,58 @@ $$;
 notify pgrst, 'reload schema';
 commit;
 
+-- Keep the original filename intact; titles are editable presentation metadata.
+begin;
+
+alter table public.order_images
+  add column if not exists title text not null default ''
+  constraint order_images_title_length_check check (length(title) <= 120);
+
+create or replace function public.update_order_image_details(
+  requested_image_id uuid,
+  requested_title text,
+  requested_description text
+) returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  saved_details jsonb;
+begin
+  if length(coalesce(requested_title, '')) > 120 then
+    raise exception 'IMAGE_TITLE_TOO_LONG';
+  end if;
+  if length(coalesce(requested_description, '')) > 1000 then
+    raise exception 'IMAGE_DESCRIPTION_TOO_LONG';
+  end if;
+
+  update public.order_images
+  set title = trim(coalesce(requested_title, '')),
+      description = trim(coalesce(requested_description, ''))
+  where id = requested_image_id
+    and upload_status = 'ready'
+    and deleted_at is null
+    and exists (
+      select 1 from public.orders
+      where orders.id = order_images.order_id
+        and orders.deleted_at is null
+    )
+  returning jsonb_build_object('title', title, 'description', description) into saved_details;
+
+  if not found then
+    raise exception 'IMAGE_NOT_FOUND';
+  end if;
+  return saved_details;
+end;
+$$;
+
+revoke all on function public.update_order_image_details(uuid, text, text) from public;
+grant execute on function public.update_order_image_details(uuid, text, text) to anon, authenticated;
+
+notify pgrst, 'reload schema';
+commit;
+
 -- Up to three PDF originals in one atomic, resumable import.
 -- Run after 20260918_order_image_deletion.sql.
 begin;
@@ -1673,6 +1725,43 @@ end;
 $$;
 revoke all on function public.complete_pdf_order_import(uuid) from public;
 grant execute on function public.complete_pdf_order_import(uuid) to anon, authenticated;
+
+notify pgrst, 'reload schema';
+commit;
+
+-- Combine pre-upload title editing with the dedicated title column.
+-- Run after 20260927_order_image_titles.sql.
+begin;
+
+create or replace function public.prepare_order_image_with_details(
+  requested_client_id uuid,
+  requested_order_id uuid,
+  requested_image_id uuid,
+  requested_filename text,
+  requested_mime_type text,
+  requested_size_bytes bigint,
+  requested_description text,
+  requested_title text
+) returns public.order_images
+language plpgsql security definer set search_path = ''
+as $$
+declare prepared public.order_images;
+begin
+  if length(coalesce(requested_title, '')) > 120 then
+    raise exception 'IMAGE_TITLE_TOO_LONG';
+  end if;
+  select * into prepared from public.prepare_order_image(
+    requested_client_id, requested_order_id, requested_image_id, requested_filename,
+    requested_mime_type, requested_size_bytes, requested_description
+  );
+  update public.order_images set title = trim(coalesce(requested_title, ''))
+    where id = prepared.id returning * into prepared;
+  return prepared;
+end;
+$$;
+
+revoke all on function public.prepare_order_image_with_details(uuid, uuid, uuid, text, text, bigint, text, text) from public;
+grant execute on function public.prepare_order_image_with_details(uuid, uuid, uuid, text, text, bigint, text, text) to anon, authenticated;
 
 notify pgrst, 'reload schema';
 commit;

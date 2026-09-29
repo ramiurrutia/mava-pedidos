@@ -59,10 +59,10 @@ export function ImageDescriptionEditor({
         <span>Título de la imagen</span>
         <input
           disabled={disabled}
-          maxLength={255}
+          maxLength={120}
           onChange={(event) => updateDetails({ title: event.target.value })}
           placeholder={current.file.name}
-          value={current.title ?? current.file.name}
+          value={current.title ?? ""}
         />
         <small className="text-[10px] text-[#8b9490]">Si lo dejás vacío, se usará el nombre del archivo.</small>
       </label>
