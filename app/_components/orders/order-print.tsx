@@ -114,7 +114,7 @@ function OrderPrintContent({ order }: { order: Order }) {
           </table>
         </section>
       )}
-      {order.total !== undefined && <p className="order-print-total"><strong>Total: {formatCurrency(order.total)}</strong></p>}
+      {order.sourceSystem !== "PDF" && order.total !== undefined && <p className="order-print-total"><strong>Total: {formatCurrency(order.total)}</strong></p>}
       {!!order.images.length && (
         <section>
           <h2>Imágenes agregadas · {order.images.length} archivos</h2>

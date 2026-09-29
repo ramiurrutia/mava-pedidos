@@ -345,7 +345,7 @@ export function OrderPage({
                     <strong className="text-xs font-semibold text-[#34413c]">{formatCurrency(item.price)}</strong>
                   </div>
                 ))}
-                {order.total !== undefined && (
+                {order.sourceSystem !== "PDF" && order.total !== undefined && (
                   <div className="flex items-center justify-between bg-[#f5f7f5] p-3 text-xs">
                     <strong>Total</strong>
                     <strong>{formatCurrency(order.total)}</strong>
@@ -388,32 +388,26 @@ export function OrderPage({
                       aria-label={`Imagen lista: ${image.title || image.name}`}
                       aria-pressed={image.preparationStatus === "Listo"}
                       aria-busy={updatingArtworkKeys.has(image.preparationKey)}
-                      className={`${image.preparationStatus === "Listo" ? "border-[#a8cbb6] bg-[#edf7f0] text-[#276146] hover:border-[#6caa86] hover:bg-[#e1f0e6]" : "border-[#dfc9a2] bg-[#fff9ed] text-[#875d21] hover:border-[#c39b5e] hover:bg-[#fff1d7]"} inline-flex min-h-12 cursor-pointer items-center gap-2.5 rounded-xl border px-3 py-2 text-left shadow-sm transition motion-safe:active:scale-[.98] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#235c4c] disabled:cursor-wait disabled:opacity-60`}
+                      title={updatingArtworkKeys.has(image.preparationKey) ? "Guardando…" : image.preparationStatus === "Listo" ? "Listo · Volver a pendiente" : "Marcar listo"}
+                      className={`${image.preparationStatus === "Listo" ? "border-[#a8cbb6] bg-[#edf7f0] text-[#276146] hover:border-[#6caa86] hover:bg-[#e1f0e6]" : "border-[#dfc9a2] bg-[#fff9ed] text-[#875d21] hover:border-[#c39b5e] hover:bg-[#fff1d7]"} grid size-11 shrink-0 cursor-pointer place-items-center rounded-xl border shadow-sm transition motion-safe:active:scale-[.98] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#235c4c] disabled:cursor-wait disabled:opacity-60 [&_svg]:size-5`}
                       disabled={updatingArtworkKeys.has(image.preparationKey)}
                       onClick={() => void changeArtworkPreparation(image.preparationKey, image.preparationStatus === "Listo" ? "Pendiente" : "Listo")}
                       type="button"
                     >
-                      <span aria-hidden="true" className={`${image.preparationStatus === "Listo" ? "bg-[#d1e9da]" : "bg-[#f6e6c5]"} grid size-7 shrink-0 place-items-center rounded-full [&_svg]:size-4`}>
-                        {updatingArtworkKeys.has(image.preparationKey) ? <SpinnerIcon className="animate-spin" /> : image.preparationStatus === "Listo" ? <CheckIcon /> : <span className="size-2 rounded-full bg-current" />}
-                      </span>
-                      <span aria-live="polite">
-                        <strong className="block text-xs font-semibold leading-tight">{image.preparationStatus}</strong>
-                        <span className="mt-0.5 block text-[10px] leading-tight">{updatingArtworkKeys.has(image.preparationKey) ? "Guardando…" : image.preparationStatus === "Listo" ? "Volver a pendiente" : "Marcar listo"}</span>
+                      <span aria-hidden="true">
+                        {updatingArtworkKeys.has(image.preparationKey) ? <SpinnerIcon className="animate-spin" /> : image.preparationStatus === "Listo" ? <CheckIcon /> : <span className="block size-5 rounded-full border-2 border-current" />}
                       </span>
                     </button>
                     <button
                       aria-label={`Eliminar imagen ${image.title || image.name}`}
                       aria-haspopup="dialog"
-                      className="ml-auto inline-flex min-h-12 cursor-pointer items-center gap-2.5 rounded-xl border border-[#e5bcb5] bg-[#fff3f0] px-3 py-2 text-left text-[#a34e42] shadow-sm transition hover:border-[#ce8d81] hover:bg-[#ffe6e0] motion-safe:active:scale-[.98] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#a34e42] disabled:cursor-not-allowed disabled:opacity-60"
+                      title="Eliminar imagen"
+                      className="ml-auto grid size-11 shrink-0 cursor-pointer place-items-center rounded-xl border border-[#e5bcb5] bg-[#fff3f0] text-[#a34e42] shadow-sm transition hover:border-[#ce8d81] hover:bg-[#ffe6e0] motion-safe:active:scale-[.98] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#a34e42] disabled:cursor-not-allowed disabled:opacity-60 [&_svg]:size-5"
                       disabled={deleting || updatingArtworkKeys.has(image.preparationKey)}
                       onClick={() => setImageToDelete(image)}
                       type="button"
                     >
-                      <span aria-hidden="true" className="grid size-7 shrink-0 place-items-center rounded-full bg-[#f7dcd5] [&_svg]:size-4"><TrashIcon /></span>
-                      <span>
-                        <strong className="block text-xs font-semibold leading-tight">Eliminar imagen</strong>
-                        <span className="mt-0.5 block text-[10px] leading-tight">Quitar del pedido</span>
-                      </span>
+                      <span aria-hidden="true"><TrashIcon /></span>
                     </button>
                   </div>
                 </li>

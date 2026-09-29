@@ -1,9 +1,11 @@
 import type { DocumentOrderPreview } from "./document-order-reader";
 
 export type DocumentBatchPreview = DocumentOrderPreview & { documents: DocumentOrderPreview[] };
+export const MAX_ORDER_PDFS = 10;
 
 export function validateDocumentSelection(files: File[]) {
-  if (!files.length || files.length > 3) throw new Error("Elegí hasta 3 PDFs para un mismo pedido, o un solo Excel.");
+  if (!files.length) throw new Error("Elegí los PDFs del pedido o un archivo Excel.");
+  if (files.length > MAX_ORDER_PDFS) throw new Error("No se pueden agregar tantos archivos al mismo pedido. Quitá algunos e intentá nuevamente.");
   if (files.length > 1 && files.some((file) => !/\.pdf$/i.test(file.name))) {
     throw new Error("Para combinar varios archivos, todos deben ser PDFs. El Excel se importa por separado.");
   }

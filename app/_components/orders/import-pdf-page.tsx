@@ -12,7 +12,7 @@ import { useOrdersWorkspace } from "./use-orders-workspace";
 import { formatCurrency, ui } from "./shared";
 
 import { readDocumentOrder, type DocumentOrderPreview } from "../../../lib/document-order-reader";
-import { combineDocumentPreviews, validateDocumentSelection, type DocumentBatchPreview } from "../../../lib/document-order-batch";
+import { combineDocumentPreviews, MAX_ORDER_PDFS, validateDocumentSelection, type DocumentBatchPreview } from "../../../lib/document-order-batch";
 
 const normalize = (value: string) => value.trim().toLocaleLowerCase("es");
 
@@ -107,13 +107,14 @@ export function ImportPdfPage() {
     setReviewed(false);
   }
   const units = preview?.products.reduce((sum, product) => sum + product.quantity, 0) ?? 0;
-  const total = preview?.products.reduce((sum, product) => sum + product.quantity * product.unitPrice, 0) ?? 0;
+  const showPrices = preview?.format === "EXCEL";
+  const total = showPrices ? preview.products.reduce((sum, product) => sum + product.quantity * product.unitPrice, 0) : 0;
   const existing = preview && orders.find((order) => order.sourceSystem === preview.format && order.sourceOrderId === preview.hash && ["pdf_complete", "excel_complete"].includes(order.sourceStatus ?? ""));
   const targetName = folderId ? folders.find((folder) => folder.id === folderId)?.name ?? "" : folderName.trim();
-  const invalidProducts = preview?.products.some((product) => !Number.isInteger(product.quantity) || product.quantity < 1 || !Number.isFinite(product.unitPrice) || product.unitPrice < 0);
+  const invalidProducts = preview?.products.some((product) => !Number.isInteger(product.quantity) || product.quantity < 1 || (showPrices && (!Number.isFinite(product.unitPrice) || product.unitPrice < 0)));
   const locked = loading || saving || Boolean(reservedId) || draftFrozen;
   const valid = preview && clientName.trim() && clientName.trim().length <= 80 && targetName && targetName.length <= 80 && !invalidProducts && units > 0 && units <= 200 && reviewed && !existing;
-  const mismatch = preview?.declaredTotal !== null && preview?.declaredTotal !== undefined && Math.abs(preview.declaredTotal - total) > 0.01;
+  const mismatch = showPrices && preview.declaredTotal !== null && Math.abs(preview.declaredTotal - total) > 0.01;
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -127,7 +128,7 @@ export function ImportPdfPage() {
         notes: [notes.trim(), preview.email ? `Correo: ${preview.email}` : "", preview.address ? `Dirección: ${preview.address}` : ""].filter(Boolean).join("\n\n"),
         uploads: preview.products.flatMap((product, index) => Array.from({ length: product.quantity }, (_, unit) => ({
           file: new File([product.file], `${preview.format === "EXCEL" ? "excel" : "pdf"}-${String(index + 1).padStart(3, "0")}-${product.code.replace(/[^a-zA-Z0-9-]/g, "-")}-${unit + 1}.jpg`, { type: "image/jpeg" }),
-          description: `${product.code} · ${product.description}\nUnidad ${unit + 1} de ${product.quantity} · Precio unitario: ${formatCurrency(product.unitPrice)}`,
+          description: `${product.code} · ${product.description}\nUnidad ${unit + 1} de ${product.quantity}${showPrices ? ` · Precio unitario: ${formatCurrency(product.unitPrice)}` : ""}`,
         }))),
       };
       setDraftFrozen(true);
@@ -152,11 +153,11 @@ export function ImportPdfPage() {
     <section className="mx-auto w-full max-w-[1000px]" aria-labelledby="pdf-import-title">
       <Link href="/pedidos/nuevo" className={`${ui.backButton} no-underline`} onClick={(event) => { if (saving) event.preventDefault(); }}><BackIcon />Volver a crear pedido</Link>
       <div className={`${ui.pageCard} mb-4`}>
-        <div className="flex items-start gap-3"><span className="grid size-11 shrink-0 place-items-center rounded-xl bg-[#e8f0ea] text-[#235c4c]"><FileIcon /></span><div><p className={ui.eyebrow}>Un pedido con todos sus documentos</p><h1 id="pdf-import-title" className="text-xl font-semibold">Importar PDFs o Excel</h1><p className="mt-2 text-xs leading-relaxed text-[#68726d]">Podés reunir hasta 3 PDFs de la misma persona en un solo pedido, o importar un Excel. Revisá los datos antes de confirmar.</p></div></div>
+        <div className="flex items-start gap-3"><span className="grid size-11 shrink-0 place-items-center rounded-xl bg-[#e8f0ea] text-[#235c4c]"><FileIcon /></span><div><p className={ui.eyebrow}>Un pedido con todos sus documentos</p><h1 id="pdf-import-title" className="text-xl font-semibold">Importar PDFs o Excel</h1><p className="mt-2 text-xs leading-relaxed text-[#68726d]">Podés reunir varios PDFs de la misma persona en un solo pedido, o importar un Excel. Revisá los datos antes de confirmar.</p></div></div>
         <input ref={inputRef} type="file" multiple accept={preview?.format === "PDF" ? "application/pdf,.pdf" : "application/pdf,.pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,.xlsx"} className="sr-only" aria-label="Seleccionar PDFs o Excel de pedido" disabled={locked} onChange={(event) => { void chooseFiles(Array.from(event.target.files ?? [])); event.target.value = ""; }} />
-        {!loading && (!preview || (preview.format === "PDF" && preview.documents.length < 3)) && <button type="button" disabled={locked} onClick={() => inputRef.current?.click()} onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); void chooseFiles(Array.from(event.dataTransfer.files)); }} className={`${ui.uploadZone} mt-5 w-full cursor-pointer transition-colors hover:bg-[#eef4ee] focus-visible:outline-2 focus-visible:outline-[#235c4c]`}><UploadIcon /><strong>{preview ? "Agregar otro PDF al mismo pedido" : "Elegir PDFs o Excel, o arrastrarlos acá"}</strong><span>Hasta 3 PDFs de MAVA o un Excel .xlsx · Hasta 20 MB y 20 páginas u hojas por archivo</span></button>}
+        {!loading && (!preview || (preview.format === "PDF" && preview.documents.length < MAX_ORDER_PDFS)) && <button type="button" disabled={locked} onClick={() => inputRef.current?.click()} onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); void chooseFiles(Array.from(event.dataTransfer.files)); }} className={`${ui.uploadZone} mt-5 w-full cursor-pointer transition-colors hover:bg-[#eef4ee] focus-visible:outline-2 focus-visible:outline-[#235c4c]`}><UploadIcon /><strong>{preview ? "Agregar otro PDF al mismo pedido" : "Elegir PDFs o Excel, o arrastrarlos acá"}</strong><span>PDFs de MAVA o un Excel .xlsx · Hasta 20 MB y 20 páginas u hojas por archivo</span></button>}
         {loading && <div role="status" className="mt-5 flex flex-col items-center gap-3 rounded-xl bg-[#f3f6f2] p-8 text-center text-sm text-[#235c4c]"><SpinnerIcon className="size-6 animate-spin" /><p>{progress}</p><button type="button" className={ui.textButton} onClick={() => { reading.current?.abort(); setLoading(false); }}>Cancelar lectura</button></div>}
-        {preview && <div className="mt-4 space-y-2"><p className="text-xs font-semibold">{preview.documents.length} {preview.format === "PDF" ? "de 3 PDFs" : "Excel"} · Un solo pedido</p>{preview.documents.map((document) => <div key={document.hash} className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-[#f3f6f2] px-3 py-2"><span className="min-w-0 break-all text-xs text-[#68726d]">{document.file.name} · {document.format === "EXCEL" ? `${document.sheets?.length ?? 0} hojas` : `${document.pages.length} páginas`} · {document.products.length} modelos</span><button type="button" className={ui.textButton} disabled={locked} aria-label={`Quitar ${document.file.name}`} onClick={() => void removeDocument(document.hash)}>Quitar</button></div>)}</div>}
+        {preview && <div className="mt-4 space-y-2"><p className="text-xs font-semibold">{preview.documents.length} {preview.format === "PDF" ? (preview.documents.length === 1 ? "PDF" : "PDFs") : "Excel"} · Un solo pedido</p>{preview.documents.map((document) => <div key={document.hash} className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-[#f3f6f2] px-3 py-2"><span className="min-w-0 break-all text-xs text-[#68726d]">{document.file.name} · {document.format === "EXCEL" ? `${document.sheets?.length ?? 0} hojas` : `${document.pages.length} páginas`} · {document.products.length} modelos</span><button type="button" className={ui.textButton} disabled={locked} aria-label={`Quitar ${document.file.name}`} onClick={() => void removeDocument(document.hash)}>Quitar</button></div>)}</div>}
       </div>
       {error && <div role="alert" className="mb-4 rounded-xl border border-[#ecc9be] bg-[#fff4ef] p-4 text-sm leading-relaxed text-[#9b4636]">{error}{reservedId && <Link className="mt-2 block underline" href={`/pedidos/${reservedId}`}>Ver el pedido reservado</Link>}</div>}
       {existing && <div className="mb-4 rounded-xl border border-[#bcd4c5] bg-[#edf5ef] p-4 text-sm"><strong>Este archivo ya tiene un pedido: {existing.code}</strong><p className="mt-1 text-xs text-[#68726d]">No vamos a crear un duplicado.</p><Link className={`${ui.primaryButton} mt-3 no-underline`} href={`/pedidos/${existing.id}`}>Abrir pedido existente</Link></div>}
@@ -178,11 +179,11 @@ export function ImportPdfPage() {
             <label className={ui.field}><span>Notas adicionales</span><textarea rows={3} maxLength={3000} value={notes} onChange={(event) => setNotes(event.target.value)} /></label>
             <label className="flex min-h-11 cursor-pointer items-center gap-3 rounded-lg bg-[#f3f6f2] p-3 text-xs"><input type="checkbox" className="size-4 accent-[#235c4c]" checked={canvasesOrdered} onChange={(event) => setCanvasesOrdered(event.target.checked)} />¿Ya se pidieron las telas?</label>
           </fieldset>
-          <section aria-labelledby="pdf-artworks-title"><h2 id="pdf-artworks-title" className="mb-2 text-base font-semibold">Cuadros reconocidos</h2><p className="mb-3 text-xs text-[#68726d]">{preview.products.length} modelos · {units} cuadros. Podés corregir cantidades, precios y notas.</p><div className="space-y-3">{preview.products.map((product) => <PdfProductEditor key={product.key} product={product} disabled={locked || Boolean(existing)} onChange={(patch) => changeProduct(product.key, patch)} />)}</div></section>
+          <section aria-labelledby="pdf-artworks-title"><h2 id="pdf-artworks-title" className="mb-2 text-base font-semibold">Cuadros reconocidos</h2><p className="mb-3 text-xs text-[#68726d]">{preview.products.length} modelos · {units} cuadros. Podés corregir cantidades y descripciones.</p><div className="space-y-3">{preview.products.map((product) => <PdfProductEditor key={product.key} showPrices={showPrices} product={product} disabled={locked || Boolean(existing)} onChange={(patch) => changeProduct(product.key, patch)} />)}</div></section>
         </div>
         <aside className="min-w-0 space-y-4 lg:sticky lg:top-[84px] lg:self-start">
           <div className={ui.pageCard}>
-            <h2 className="text-base font-semibold">Revisar y confirmar</h2><p className="mt-2 text-sm">{units} cuadros · <strong>{formatCurrency(total)}</strong></p><p className="mt-2 break-words text-xs text-[#68726d]">Carpeta: <strong>{targetName.toLocaleUpperCase("es") || "Sin elegir"}</strong></p>
+            <h2 className="text-base font-semibold">Revisar y confirmar</h2><p className="mt-2 text-sm">{units} cuadros{showPrices && <> · <strong>{formatCurrency(total)}</strong></>}</p><p className="mt-2 break-words text-xs text-[#68726d]">Carpeta: <strong>{targetName.toLocaleUpperCase("es") || "Sin elegir"}</strong></p>
             {(preview.warnings.length > 0 || mismatch) && <div className="mt-3 rounded-lg bg-[#fff5e9] p-3 text-xs leading-relaxed text-[#965d30]"><strong>Hay datos para revisar</strong><ul className="mt-2 list-disc space-y-1 pl-4">{preview.warnings.map((warning, index) => <li key={index}>{warning}</li>)}{mismatch && <li>Total impreso: {formatCurrency(preview.declaredTotal!)}. Se guardará el total que revisaste.</li>}</ul></div>}
             {units > 200 && <p role="alert" className="mt-3 text-xs text-[#a44236]">El máximo por pedido es de 200 cuadros.</p>}
             <label className="mt-4 flex cursor-pointer items-start gap-2 text-xs leading-relaxed"><input type="checkbox" className="mt-0.5 size-4 shrink-0 accent-[#235c4c]" checked={reviewed} disabled={locked || Boolean(existing)} onChange={(event) => setReviewed(event.target.checked)} />Revisé los cuadros, sus cantidades y la carpeta de destino.</label>
