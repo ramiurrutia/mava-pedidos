@@ -31,7 +31,7 @@ export function PdfProductEditor({ product, disabled, onChange }: { product: Pdf
     <div className="rounded-xl border border-[#e0e6e0] bg-white p-3 sm:p-4">
       <div className="mb-3 flex items-start gap-3">
         <button type="button" aria-label={`Ampliar ${product.code}`} onClick={() => setOpen(true)} className="size-20 shrink-0 cursor-zoom-in rounded-lg border border-[#e0e6e0] bg-[#f8f9f6] bg-contain bg-center bg-no-repeat focus-visible:outline-2 focus-visible:outline-[#235c4c]" style={{ backgroundImage: `url("${product.previewUrl}")` }} />
-        <div className="min-w-0 flex-1"><strong className="block text-sm">{product.code}</strong><p className="mt-1 text-xs leading-relaxed text-[#68726d]">{product.description}</p></div>
+        <div className="min-w-0 flex-1"><strong className="block text-sm">{product.code}</strong>{product.sourceFilename && <small className="mt-1 block break-all text-[10px] text-[#68726d]">{product.sourceFilename}</small>}<p className="mt-1 text-xs leading-relaxed text-[#68726d]">{product.description}</p></div>
       </div>
       <div className="grid grid-cols-2 gap-3">
         <label className={ui.field}><span>Cantidad</span><input disabled={disabled} type="number" inputMode="numeric" min={1} max={200} step={1} required value={product.quantity || ""} onChange={(event) => onChange({ quantity: Number(event.target.value) })} /></label>

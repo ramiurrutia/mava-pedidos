@@ -73,6 +73,21 @@
   }
 }
 
+@keyframes order-step-enter {
+  from {
+    opacity: 0;
+    transform: translateY(var(--order-step-offset, 18px));
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.order-step-enter {
+  animation: order-step-enter 320ms cubic-bezier(.22, 1, .36, 1) both;
+}
+
 @keyframes skeleton-shimmer {
   0% {
     transform: translateX(-110%);

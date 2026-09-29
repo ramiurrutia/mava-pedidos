@@ -21,10 +21,10 @@ export function ImageDescriptionEditor({
 
   if (!current) return null;
 
-  function updateDescription(description: string) {
+  function updateDetails(details: Partial<Pick<PendingImageUpload, "title" | "description">>) {
     if (disabled) return;
     onChange(uploads.map((upload, index) => (
-      index === currentIndex ? { ...upload, description } : upload
+      index === currentIndex ? { ...upload, ...details } : upload
     )));
   }
 
@@ -38,7 +38,7 @@ export function ImageDescriptionEditor({
     <div className="grid gap-4">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <strong className="block text-xs font-semibold">Descripción de la imagen</strong>
+          <strong className="block text-xs font-semibold">Título y descripción de la imagen</strong>
           <span className="mt-1 block text-[10px] text-[#75807b]">Imagen {currentIndex + 1} de {uploads.length}</span>
         </div>
         <span className="rounded-full bg-[#edf3ef] px-2.5 py-1.5 text-[9px] font-semibold text-[#235c4c]">
@@ -47,7 +47,7 @@ export function ImageDescriptionEditor({
       </div>
 
       <div className="relative aspect-4/3 overflow-hidden rounded-xl bg-[#202825]">
-        <LocalImagePreview alt={current.file.name} file={current.file} />
+        <LocalImagePreview alt={current.title?.trim() || current.file.name} file={current.file} />
       </div>
       <div className="flex justify-end">
         <button className={`${ui.secondaryButton} text-[#a34e42]`} disabled={disabled} onClick={removeCurrentImage} type="button">
@@ -56,12 +56,22 @@ export function ImageDescriptionEditor({
       </div>
 
       <label className={`${ui.field} mb-0`}>
-        <span>Nota de esta imagen</span>
+        <span>Título de la imagen</span>
+        <input
+          disabled={disabled}
+          maxLength={255}
+          onChange={(event) => updateDetails({ title: event.target.value })}
+          placeholder={current.file.name}
+          value={current.title ?? current.file.name}
+        />
+        <small className="text-[10px] text-[#8b9490]">Si lo dejás vacío, se usará el nombre del archivo.</small>
+      </label>
+      <label className={`${ui.field} mb-0`}>
+        <span>Descripción de la imagen</span>
         <textarea
-          autoFocus
           disabled={disabled}
           maxLength={1000}
-          onChange={(event) => updateDescription(event.target.value)}
+          onChange={(event) => updateDetails({ description: event.target.value })}
           placeholder="Escribir descripción"
           rows={4}
           value={current.description}
@@ -82,7 +92,8 @@ export function ImageDescriptionEditor({
           <div className="flex gap-2 overflow-x-auto pb-1">
             {uploads.map((upload, index) => (
               <button
-                aria-label={`Editar descripción de ${upload.file.name}`}
+                aria-label={`Editar imagen ${index + 1}: ${upload.title?.trim() || upload.file.name}`}
+                aria-pressed={index === currentIndex}
                 className={`${index === currentIndex ? "ring-2 ring-[#235c4c] ring-offset-2" : "opacity-65 hover:opacity-100"} relative size-14 shrink-0 overflow-hidden rounded-lg bg-[#e8ece9] transition`}
                 key={`${upload.file.name}-${upload.file.lastModified}-${index}`}
                 onClick={() => setSelectedIndex(index)}

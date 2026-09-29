@@ -15,6 +15,7 @@ import { ui } from "./shared";
 import { ImageDescriptionEditor } from "./image-description-editor";
 import { SelectedImageThumbnails } from "./local-image-preview";
 import { ImagePasteArea } from "./image-paste-area";
+import { OrderStepCard } from "./order-step-card";
 
 export function UploadToFolderPage({
   folders,
@@ -93,14 +94,14 @@ export function UploadToFolderPage({
 
   return (
     <section className={ui.pagePanel} aria-labelledby="upload-folder-title">
-      <button className={ui.backButton} type="button" onClick={goBack}>
+      <button className={ui.backButton} disabled={uploading} type="button" onClick={goBack}>
         <BackIcon />{step === 1 ? "Volver al dashboard" : "Volver al paso anterior"}
       </button>
-      <div className={ui.pageCard}>
+      <OrderStepCard step={step}>
         <div className={ui.pageHead}>
           <div>
             <p className={ui.eyebrow}>Paso {step} de 3</p>
-            <h2 id="upload-folder-title">{step === 1 ? "Subir imágenes" : step === 2 ? "Describir imágenes" : "¿A qué pedido las asignamos?"}</h2>
+            <h2 className="outline-none" id="upload-folder-title" tabIndex={-1}>{step === 1 ? "Subir imágenes" : step === 2 ? "Editar títulos y descripciones" : "¿A qué pedido las asignamos?"}</h2>
           </div>
         </div>
         <form onSubmit={submit}>
@@ -118,7 +119,7 @@ export function UploadToFolderPage({
                 <input ref={fileInput} type="file" accept="image/*" multiple hidden onChange={(event) => { const files = Array.from(event.target.files ?? []); setUploads((current) => [...current, ...createPendingImageUploads(files)]); event.target.value = ""; }} />
                 <UploadIcon />
                 <strong>{uploads.length ? `${uploads.length} imagen${uploads.length === 1 ? "" : "es"} lista${uploads.length === 1 ? "" : "s"}` : "Seleccioná las imágenes"}</strong>
-                <span>En el próximo paso podrás escribir una nota para cada imagen.</span>
+                <span>En el próximo paso podrás editar el título y la descripción de cada imagen.</span>
                 <button type="button" className={ui.secondaryButton} onClick={() => fileInput.current?.click()}>Seleccionar archivos</button>
               </div>
               {uploads.length > 0 && <SelectedImageThumbnails uploads={uploads} onRemove={(index) => setUploads((current) => current.filter((_, currentIndex) => currentIndex !== index))} />}
@@ -146,17 +147,17 @@ export function UploadToFolderPage({
                   </select>
                 </label>
               )}
-              <div className={ui.safetyNote}><span>✓</span><p><strong>Destino confirmado</strong>Las imágenes y sus descripciones quedarán vinculadas por ID al pedido elegido.</p></div>
+              <div className={ui.safetyNote}><span>✓</span><p><strong>Destino confirmado</strong>Las imágenes, con sus títulos y descripciones, quedarán vinculadas al pedido elegido.</p></div>
             </div>
           )}
           <div className="mt-5 flex justify-end">
             <button className={ui.primaryButton} disabled={!uploads.length || uploading || (step === 3 && assignment === "existing" && !effectiveOrderId)} type="submit">
               {uploading && <SpinnerIcon className="animate-spin" />}
-              {uploading ? "Guardando..." : step !== 3 ? "Continuar" : assignment === "new" ? "Crear y asignar" : "Asignar imágenes"}
+              {uploading ? "Guardando..." : step !== 3 ? "Continuar" : assignment === "new" ? "Crear pedido y subir imágenes" : "Subir imágenes al pedido"}
             </button>
           </div>
         </form>
-      </div>
+      </OrderStepCard>
     </section>
   );
 }

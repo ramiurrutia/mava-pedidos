@@ -15,6 +15,7 @@ import { ui } from "./shared";
 import { ImageDescriptionEditor } from "./image-description-editor";
 import { SelectedImageThumbnails } from "./local-image-preview";
 import { ImagePasteArea } from "./image-paste-area";
+import { OrderStepCard } from "./order-step-card";
 
 export function CreateOrderPage({
   folders,
@@ -64,6 +65,7 @@ export function CreateOrderPage({
 
     if (step === 1) {
       setSelectedOrderId(recommendedOrder?.id ?? "");
+      if (!uploads.length) setAssignment("new");
       setStep(uploads.length ? 2 : 3);
       return;
     }
@@ -92,18 +94,16 @@ export function CreateOrderPage({
 
   const title = step === 1
     ? "Crear pedido"
-    : step === 2
-      ? "Describir imágenes"
-      : uploads.length ? "Asignar imágenes" : "Confirmar pedido";
+    : step === 2 ? "Editar títulos y descripciones" : "Confirmar pedido";
 
   return (
     <section className={ui.pagePanel} aria-labelledby="new-order-title">
-      <button className={ui.backButton} type="button" onClick={goBack}>
+      <button className={ui.backButton} disabled={saving} type="button" onClick={goBack}>
         <BackIcon />{step === 1 ? "Volver al dashboard" : "Volver al paso anterior"}
       </button>
-      <div className={ui.pageCard}>
+      <OrderStepCard step={step}>
         <div className={ui.pageHead}>
-          <div><p className={ui.eyebrow}>Nuevo pedido · Paso {displayedStep} de {totalSteps}</p><h2 id="new-order-title">{title}</h2></div>
+          <div><p className={ui.eyebrow}>Nuevo pedido · Paso {displayedStep} de {totalSteps}</p><h2 className="outline-none" id="new-order-title" tabIndex={-1}>{title}</h2></div>
         </div>
         <form onSubmit={submit}>
           {step === 1 && <Link href="/pedidos/importar" className="mb-5 flex items-center gap-3 rounded-xl border border-[#cbdcd1] bg-[#f0f6f1] p-4 text-inherit no-underline transition-colors hover:bg-[#e6f0e8] focus-visible:outline-2 focus-visible:outline-[#235c4c]"><FileIcon className="size-5 shrink-0 text-[#235c4c]" /><span><strong className="block text-sm font-semibold">¿Tenés el pedido en PDF o Excel?</strong><small className="mt-1 block text-xs text-[#68726d]">Importar datos, cantidades y fotos con vista previa</small></span></Link>}
@@ -145,11 +145,11 @@ export function CreateOrderPage({
           <div className="mt-5 flex justify-end">
             <button className={ui.primaryButton} disabled={saving || (step === 3 && assignment === "existing" && (!uploads.length || !effectiveOrderId))} type="submit">
               {saving && <SpinnerIcon className="animate-spin" />}
-              {saving ? "Guardando..." : step !== 3 ? "Continuar" : assignment === "new" ? "Crear pedido" : "Asignar imágenes"}
+              {saving ? "Guardando..." : step !== 3 ? "Continuar" : assignment === "new" ? (uploads.length ? "Crear pedido y subir imágenes" : "Crear pedido") : "Subir imágenes al pedido"}
             </button>
           </div>
         </form>
-      </div>
+      </OrderStepCard>
     </section>
   );
 }
@@ -225,7 +225,7 @@ function FirstStep({
         <input ref={fileInput} type="file" accept="image/*" multiple hidden onChange={(event) => { onFilesChange(Array.from(event.target.files ?? [])); event.target.value = ""; }} />
         <UploadIcon />
         <strong>{uploads.length ? `${uploads.length} imagen${uploads.length === 1 ? "" : "es"} seleccionada${uploads.length === 1 ? "" : "s"}` : "Agregar imágenes"}</strong>
-        <span>{uploads.length ? "En el próximo paso podrás escribir una nota para cada imagen." : "Podés crear el pedido sin imágenes y agregarlas después."}</span>
+        <span>{uploads.length ? "En el próximo paso podrás editar el título y la descripción de cada imagen." : "Podés crear el pedido sin imágenes y agregarlas después."}</span>
         <button type="button" className={ui.secondaryButton} onClick={() => fileInput.current?.click()}>Seleccionar archivos</button>
       </div>
       {uploads.length > 0 && <SelectedImageThumbnails uploads={uploads} onRemove={onRemoveImage} />}
@@ -396,7 +396,7 @@ function AssignmentStep({
           <dd className="truncate text-right font-semibold">{assignment === "new" ? "Pedido nuevo" : pendingOrders.find((order) => order.id === effectiveOrderId)?.code ?? "Pedido activo"}</dd>
         </dl>
       </div>
-      <div className={ui.safetyNote}><span>✓</span><p><strong>Confirmación manual</strong>Cada imagen y su descripción quedarán vinculadas al pedido elegido mediante su ID.</p></div>
+      <div className={ui.safetyNote}><span>✓</span><p><strong>Confirmación manual</strong>Cada imagen, con su título y descripción, quedará vinculada al pedido elegido.</p></div>
     </div>
   );
 }

@@ -19,11 +19,12 @@ export type OrderImage = {
 
 export type PendingImageUpload = {
   file: File;
+  title?: string;
   description: string;
 };
 
 export function createPendingImageUploads(files: File[]): PendingImageUpload[] {
-  return files.map((file) => ({ file, description: "" }));
+  return files.map((file) => ({ file, title: file.name, description: "" }));
 }
 
 export type OrderItem = {

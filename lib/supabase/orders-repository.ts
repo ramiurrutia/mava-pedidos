@@ -398,7 +398,8 @@ export async function uploadRemoteImages({
         requested_client_id: clientId,
         requested_order_id: resolvedOrderId ?? null,
         requested_image_id: imageId,
-        requested_filename: file.name,
+        // This metadata is displayed as the image name throughout the order.
+        requested_filename: item.title?.trim() || file.name,
         requested_mime_type: file.type,
         requested_size_bytes: file.size,
         requested_description: item.description.trim(),
