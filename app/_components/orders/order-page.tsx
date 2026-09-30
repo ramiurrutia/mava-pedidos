@@ -22,6 +22,7 @@ import { ImageDescriptionEditor } from "./image-description-editor";
 import { ImagePasteArea } from "./image-paste-area";
 import { OrderEditModal } from "./order-edit-modal";
 import { OrderPdfAttachment } from "./order-pdf-attachment";
+import { ImportPdfPage } from "./import-pdf-page";
 import { OrderPrintButton } from "./order-print";
 import { DeleteImageDialog } from "./delete-image-dialog";
 import { formatCurrency, statuses, statusStyles, ui } from "./shared";
@@ -34,6 +35,7 @@ export function OrderPage({
   onEdit,
   onEditImageDetails,
   onDeleteImage,
+  onDeletePdf,
   onCanvasesOrderedChange,
   onArtworkPreparationChange,
   onDelete,
@@ -45,6 +47,7 @@ export function OrderPage({
   onEdit: (input: OrderDetailsInput) => Promise<boolean>;
   onEditImageDetails: (imageId: string, details: ImageDetails) => Promise<ImageDetails | null>;
   onDeleteImage: (imageId: string) => Promise<boolean>;
+  onDeletePdf: (hash: string) => Promise<boolean>;
   onCanvasesOrderedChange: (value: boolean) => Promise<boolean>;
   onArtworkPreparationChange: (artworkKey: string, status: ArtworkPreparationStatus) => Promise<boolean>;
   onDelete: () => Promise<boolean>;
@@ -53,6 +56,7 @@ export function OrderPage({
   const [pendingUploads, setPendingUploads] = useState<PendingImageUpload[]>([]);
   const [uploading, setUploading] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [addingPdfs, setAddingPdfs] = useState(false);
   const searchParams = useSearchParams();
   const [savingCanvasesOrdered, setSavingCanvasesOrdered] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -184,6 +188,8 @@ export function OrderPage({
     }
   }
 
+  if (addingPdfs) return <ImportPdfPage targetOrder={order} onClose={() => setAddingPdfs(false)} />;
+
   return (
     <section className={ui.pagePanel} aria-labelledby="order-title">
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
@@ -307,7 +313,7 @@ export function OrderPage({
             </div>
           )}
             <OrderNotes notes={order.notes} fromPdf={order.sourceSystem === "PDF"} />
-            {(order.sourceSystem === "PDF" || order.sourceSystem === "EXCEL") && <OrderPdfAttachment key={order.id} orderId={order.id} format={order.sourceSystem} complete={order.sourceStatus === "pdf_complete" || order.sourceStatus === "excel_complete"} />}
+            {(order.sourceSystem === "PDF" || order.sourceSystem === "EXCEL") && <OrderPdfAttachment key={order.id} orderId={order.id} format={order.sourceSystem} complete={order.sourceStatus === "pdf_complete" || order.sourceStatus === "excel_complete"} canAdd={canAddImages} onAdd={() => setAddingPdfs(true)} onDelete={onDeletePdf} />}
           {(order.items?.length ?? 0) > 0 && (
             <div className={`${ui.detailBlock} order-4`}>
               <div className={ui.detailTitle}>

@@ -1,7 +1,7 @@
 import { parseMavaPdf, type ParsedPdfOrder, type PdfImageBox, type PdfPageData, type PdfProduct } from "./pdf-order-parser";
 import type { PDFPageProxy } from "pdfjs-dist";
 
-export type PdfProductPreview = PdfProduct & { file: File; previewUrl: string; sourceFilename?: string };
+export type PdfProductPreview = PdfProduct & { file: File; previewUrl: string; sourceFilename?: string; sourceDocumentHash?: string };
 export type PdfOrderPreview = Omit<ParsedPdfOrder, "products"> & {
   hash: string; file: File; products: PdfProductPreview[];
   pages: Array<{ number: number; previewUrl: string }>; dispose: () => void;

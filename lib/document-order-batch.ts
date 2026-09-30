@@ -28,7 +28,7 @@ export async function combineDocumentPreviews(documents: DocumentOrderPreview[])
   return {
     ...first, hash, documents: sorted,
     products: sorted.flatMap((document) => document.products.map((product) => ({
-      ...product, key: `${document.hash}:${product.key}`, sourceFilename: document.file.name,
+      ...product, key: `${document.hash}:${product.key}`, sourceFilename: document.file.name, sourceDocumentHash: document.hash,
     }))),
     pages: sorted.flatMap((document) => document.pages), warnings,
     declaredTotal: sorted.every((document) => document.declaredTotal !== null)

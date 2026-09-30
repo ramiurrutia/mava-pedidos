@@ -2,6 +2,7 @@
 
 import { createContext, createElement, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { sileo } from "sileo";
+import { deleteOrderPdfDocument } from "../../../lib/supabase/pdf-orders-repository";
 import {
   findLatestPendingOrder,
   getOrderFolderId,
@@ -427,6 +428,16 @@ function useOrdersWorkspaceState() {
     }
   }
 
+  async function deletePdfDocument(orderId: string, hash: string) {
+    if (dataSource !== "supabase") return false;
+    const removedIds = await deleteOrderPdfDocument(orderId, hash);
+    removedIds.forEach((id) => deletedImageIds.current.add(id));
+    setOrders((current) => current.map((order) => order.id === orderId
+      ? { ...order, images: order.images.filter((image) => !deletedImageIds.current.has(image.id)) } : order));
+    sileo.success({ title: "PDF eliminado", description: "Se quitaron el documento y sus imágenes del pedido." });
+    return true;
+  }
+
   async function deleteImage(orderId: string, imageId: string) {
     if (dataSource !== "supabase" || deletingImages.current.has(imageId)) return false;
     deletingImages.current.add(imageId);
@@ -541,6 +552,7 @@ function useOrdersWorkspaceState() {
     updateImageDetails,
     deleteOrder,
     deleteImage,
+    deletePdfDocument,
     uploadImagesToFolder,
     createPendingOrderWithImages,
   };
