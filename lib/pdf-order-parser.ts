@@ -14,9 +14,78 @@ const normalize = (value: string) => value.normalize("NFD").replace(/\p{Diacriti
 const unrecognizedPdf = "No se reconocieron cuadros. Usá un PDF con texto seleccionable y fotos junto a sus descripciones, o un pedido de MAVA; las fotos o escaneos de páginas completas todavía no se reconocen.";
 
 export function parsePdfOrder(pages: PdfPageData[]): ParsedPdfOrder {
+  if (pages.some((page) => page.texts.some((text) => normalize(text.text).replace(/\s*\/\s*/g, "/") === "cantidad/producto"))) return parseMavaQrPdf(pages);
   // Keep the original table parser (and product ordering) for existing imports.
   const hasMavaTable = pages.some((page) => ["descripcion", "imagen", "cantidad"].every((label) => page.texts.some((text) => normalize(text.text) === label)));
   return hasMavaTable ? parseMavaPdf(pages) : parseIllustratedList(pages);
+}
+
+function parseMavaQrPdf(pages: PdfPageData[]): ParsedPdfOrder {
+  const result: ParsedPdfOrder = { clientName: "", email: "", phone: "", address: "", locality: "", products: [], declaredTotal: null, warnings: [] };
+  const first = pages[0]?.texts ?? [];
+  const field = (label: string) => {
+    const heading = first.find((text) => normalize(text.text) === label);
+    if (!heading) return "";
+    const value = first.filter((text) => Math.abs(text.x - heading.x) < 4 && text.y < heading.y - 8 && text.y > heading.y - 50)
+      .sort((a, b) => b.y - a.y).map((text) => text.text.trim()).join(" ");
+    return /^n\/?a$/i.test(value) ? "" : value;
+  };
+  result.clientName = field("cliente");
+  result.locality = field("localidad");
+  result.phone = field("telefono");
+  result.email = field("correo");
+  for (const page of pages) {
+    const texts = page.texts.filter((text) => text.text.trim());
+    const header = texts.find((text) => normalize(text.text).replace(/\s*\/\s*/g, "/") === "cantidad/producto");
+    const imageHeader = texts.find((text) => normalize(text.text) === "imagenes");
+    const commentsHeader = texts.find((text) => normalize(text.text) === "comentarios");
+    const shipping = texts.find((text) => normalize(text.text).startsWith("detalles de envio"));
+    if (shipping) result.address = texts.filter((text) => Math.abs(text.y - shipping.y) < 3 && text.x >= shipping.x)
+      .sort((a, b) => a.x - b.x).map((text) => text.text.trim()).join(" ").replace(/^detalles de env[ií]o\s*:?\s*/i, "");
+    if (!header || !imageHeader || !commentsHeader) {
+      result.warnings.push(`No se reconoció la tabla en la página ${page.number}.`);
+      continue;
+    }
+    const footer = texts.filter((text) => text.y < header.y && /^(detalles de envio|comentarios generales)/.test(normalize(text.text)))
+      .sort((a, b) => b.y - a.y)[0];
+    const bottom = footer ? footer.y + footer.height : 30;
+    const body = texts.filter((text) => text.y < header.y - 10 && text.y > bottom);
+    // Quantities begin each row at the left edge, even when the description wraps.
+    const anchors = body.filter((text) => Math.abs(text.x - header.x) < 4 && /^\d+(?:\s+\S.*)?$/.test(text.text.trim()))
+      .sort((a, b) => b.y - a.y);
+    const imageEnd = (imageHeader.x + imageHeader.width + commentsHeader.x) / 2;
+    const columnImages = page.images.filter((image) => image.x + image.width / 2 > imageHeader.x - imageHeader.width
+      && image.x + image.width / 2 < imageEnd && image.y + image.height / 2 < header.y && image.y + image.height / 2 > bottom);
+    const imageStart = columnImages.length ? Math.min(...columnImages.map((image) => image.x)) - 4 : imageHeader.x - imageHeader.width;
+    for (const [index, anchor] of anchors.entries()) {
+      const next = anchors[index + 1];
+      const row = body.filter((text) => text !== anchor && text.y <= anchor.y + 3 && text.y > (next ? next.y + 3 : bottom))
+        .sort((a, b) => Math.abs(a.y - b.y) < 3 ? a.x - b.x : b.y - a.y);
+      const match = /^(\d+)(?:\s+(.*))?$/.exec(anchor.text.trim())!;
+      const detail = [match[2] ?? "", ...row.filter((text) => text.x < imageStart).map((text) => text.text.trim())].filter(Boolean).join(" ");
+      const code = /^(.+?\([\w-]+\))\s*(.*)$/.exec(detail);
+      const product: PdfProduct = { key: `product-${result.products.length + 1}`, code: code?.[1] ?? `Imagen ${result.products.length + 1}`,
+        description: code?.[2] ?? detail, quantity: Number(match[1]), unitPrice: 0 };
+      // Photos are vertically centered in each row, rather than aligned with its first line.
+      const center = anchor.y + anchor.height / 2;
+      const upper = index ? (center + anchors[index - 1].y + anchors[index - 1].height / 2) / 2 : header.y - 10;
+      const lower = next ? (center + next.y + next.height / 2) / 2 : bottom;
+      const images = columnImages.filter((image) => image.y + image.height / 2 < upper && image.y + image.height / 2 >= lower)
+        .sort((a, b) => b.width * b.height - a.width * a.height);
+      if (images[0]) product.image = { ...images[0], page: page.number };
+      else result.warnings.push(`No se pudo extraer la foto de ${detail || product.code}.`);
+      if (images.length > 1) result.warnings.push(`Revisá las imágenes de ${product.code}: se tomó la foto más grande de la fila.`);
+      const comments = body.filter((text) => text.x >= imageEnd && text.y + text.height / 2 < upper && text.y + text.height / 2 >= lower)
+        .sort((a, b) => b.y - a.y || a.x - b.x).map((text) => text.text.trim()).join(" ");
+      if (comments) product.description = [product.description, `Comentarios: ${comments}`].filter(Boolean).join(" · ");
+      if (!detail) result.warnings.push(`Revisá la descripción de ${product.code}.`);
+      if (!Number.isSafeInteger(product.quantity) || product.quantity < 1) result.warnings.push(`Revisá la cantidad de ${product.code}.`);
+      result.products.push(product);
+    }
+  }
+  if (!result.products.length) throw new Error(unrecognizedPdf);
+  if (!result.clientName) result.warnings.push("Completá el nombre del cliente.");
+  return result;
 }
 
 function parseIllustratedList(pages: PdfPageData[]): ParsedPdfOrder {
