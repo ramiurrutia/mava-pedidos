@@ -58,6 +58,9 @@
   .order-print-artwork img { width: 45mm; height: 45mm; flex-shrink: 0; }
   .order-print-artwork figcaption { min-width: 0; }
   .order-print-notes { white-space: pre-wrap; }
+  .order-print-order-notes { margin: 5mm 0; padding: 3mm 4mm; border: 1pt solid #333; overflow-wrap: anywhere; }
+  .order-print .order-print-order-notes h2 { margin: 0 0 2mm; }
+  .order-print-order-notes strong { font-weight: 700; font-size: 12pt; }
   .order-print-missing { display: inline-block; color: #666; font-size: 9pt; }
   .order-print tr, .order-print-artwork, .order-print-header, .order-print-details > div { break-inside: avoid; }
 }

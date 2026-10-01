@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { PendingImageUpload } from "../../../lib/orders";
+import { getImageTitle } from "../../../lib/image-title";
 import { ArrowIcon, BackIcon, TrashIcon } from "../icons";
 import { LocalImagePreview } from "./local-image-preview";
 import { ui } from "./shared";
@@ -61,10 +62,10 @@ export function ImageDescriptionEditor({
           disabled={disabled}
           maxLength={120}
           onChange={(event) => updateDetails({ title: event.target.value })}
-          placeholder={current.file.name}
+          placeholder={getImageTitle(undefined, current.description) || current.file.name}
           value={current.title ?? ""}
         />
-        <small className="text-[10px] text-[#8b9490]">Si lo dejás vacío, se usará el nombre del archivo.</small>
+        <small className="text-[10px] text-[#8b9490]">Si lo dejás vacío, se usará la medida detectada en la descripción o el nombre del archivo.</small>
       </label>
       <label className={`${ui.field} mb-0`}>
         <span>Descripción de la imagen</span>

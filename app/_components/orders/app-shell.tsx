@@ -76,7 +76,7 @@ export function AppShell({
           <Link
             aria-current={activeView === view ? "page" : undefined}
             className={`${ui.navItem} ${activeView === view ? ui.navActive : ""}`}
-            href={rememberedRoutes[view]}
+            href={activeView === view ? defaultRoutes[view] : rememberedRoutes[view]}
             key={label}
           >
             <Icon /><span>{label}</span>

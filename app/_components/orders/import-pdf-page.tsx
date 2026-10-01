@@ -131,7 +131,7 @@ export function ImportPdfPage({ targetOrder, onClose }: { targetOrder?: Order; o
         notes: [notes.trim(), preview.email ? `Correo: ${preview.email}` : "", preview.address ? `Dirección: ${preview.address}` : ""].filter(Boolean).join("\n\n"),
         uploads: preview.products.flatMap((product, index) => Array.from({ length: product.quantity }, (_, unit) => ({
           file: new File([product.file], `${preview.format === "EXCEL" ? "excel" : "pdf"}-${String(index + 1).padStart(3, "0")}-${product.code.replace(/[^a-zA-Z0-9-]/g, "-")}-${unit + 1}.jpg`, { type: "image/jpeg" }),
-          description: `${product.code} · ${product.description}\nUnidad ${unit + 1} de ${product.quantity}${showPrices ? ` · Precio unitario: ${formatCurrency(product.unitPrice)}` : ""}`,
+          description: `${product.code} · ${product.description}${showPrices ? `\nPrecio unitario: ${formatCurrency(product.unitPrice)}` : ""}`,
           sourceDocumentHash: product.sourceDocumentHash,
         }))),
       };

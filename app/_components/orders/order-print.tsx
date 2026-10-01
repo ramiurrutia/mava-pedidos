@@ -96,9 +96,11 @@ function OrderPrintContent({ order }: { order: Order }) {
         {order.contactName && <div><dt>Contacto</dt><dd>{order.contactName}</dd></div>}
         {order.whatsapp && <div><dt>WhatsApp</dt><dd>{order.whatsapp}</dd></div>}
         {order.locality && <div><dt>Localidad</dt><dd>{order.locality}</dd></div>}
-        {order.folderName && <div><dt>Carpeta</dt><dd>{order.folderName}</dd></div>}
-        <div><dt>Telas pedidas</dt><dd>{order.canvasesOrdered ? "Sí" : "No"}</dd></div>
       </dl>
+      <section className="order-print-order-notes">
+        <h2>Notas del pedido</h2>
+        <p className="order-print-notes"><strong>{order.notes || "Sin notas adicionales para este pedido."}</strong></p>
+      </section>
       {!!order.items?.length && (
         <section>
           <h2>Cuadros de MAVA STOCK · {order.items.length} unidades</h2>
@@ -126,7 +128,6 @@ function OrderPrintContent({ order }: { order: Order }) {
           ))}
         </section>
       )}
-      <section><h2>Notas</h2><p className="order-print-notes">{order.notes || "Sin notas adicionales para este pedido."}</p></section>
     </>
   );
 }
