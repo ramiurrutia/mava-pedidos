@@ -1,4 +1,4 @@
-import { parseMavaPdf, type ParsedPdfOrder, type PdfImageBox, type PdfPageData, type PdfProduct } from "./pdf-order-parser";
+import { parsePdfOrder, type ParsedPdfOrder, type PdfImageBox, type PdfPageData, type PdfProduct } from "./pdf-order-parser";
 import type { PDFPageProxy } from "pdfjs-dist";
 
 export type PdfProductPreview = PdfProduct & { file: File; previewUrl: string; sourceFilename?: string; sourceDocumentHash?: string };
@@ -35,7 +35,7 @@ export async function readPdfOrder(file: File, signal: AbortSignal, onProgress: 
       const text = await page.getTextContent();
       structures.push({ number, texts: text.items.flatMap((item) => "str" in item && item.str.trim() ? [{ text: item.str, x: item.transform[4], y: item.transform[5], width: item.width, height: item.height }] : []), images: await imageBoxes(page, pdfjs.OPS) });
     }
-    const parsed = parseMavaPdf(structures);
+    const parsed = parsePdfOrder(structures);
     if (parsed.products.length > 100 || parsed.products.reduce((sum, product) => sum + product.quantity, 0) > MAX_PDF_UNITS) throw new Error("El límite por importación es de 100 modelos o 200 cuadros.");
     const photos = new Map<string, File>();
     const pages: PdfOrderPreview["pages"] = [];
