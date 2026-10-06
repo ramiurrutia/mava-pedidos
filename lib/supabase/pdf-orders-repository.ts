@@ -41,6 +41,7 @@ export async function importDocumentOrder(input: DocumentImportInput, onProgress
     requested_images: input.uploads.map(({ file, description, sourceDocumentHash }) => ({ filename: file.name, mimeType: file.type, size: file.size, description, documentHash: sourceDocumentHash })),
   });
   if (error) {
+    if (error.message.includes("PDF_IMPORT_NOT_FOUND") && input.orderId) throw new DocumentImportError("Falta aplicar la migración 20261006_pdf_attachments_for_all_orders.sql en Supabase para agregar PDFs a este pedido. No se modificó el pedido.", undefined, true);
     if (error.code === "PGRST202" || error.code === "42883") throw new DocumentImportError(`Falta aplicar la migración ${excel ? "de importación de Excel" : "20260930_order_pdf_management.sql"} en Supabase. No se creó ningún pedido.`, undefined, true);
     if (error.message.includes("PDF_DOCUMENT_LIMIT")) throw new DocumentImportError("No se pueden agregar más archivos a este pedido. Quitá alguno antes de continuar.", undefined, true);
     if (error.message.includes("PDF_DOCUMENT_DELETED")) throw new DocumentImportError("Ese PDF ya fue eliminado del pedido. No se restauraron sus imágenes.", undefined, true);
