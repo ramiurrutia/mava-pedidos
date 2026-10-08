@@ -1,5 +1,23 @@
 @import "tailwindcss";
 
+.order-archive-row > span:not([aria-hidden]),
+.order-archive-row > .order-row-actions {
+  transition: filter 220ms ease, opacity 220ms ease;
+}
+
+.order-archive-row[data-archiving] > span:not([aria-hidden]),
+.order-archive-row[data-archiving] > .order-row-actions {
+  filter: blur(3px);
+  opacity: 0.45;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .order-archive-row > span:not([aria-hidden]),
+  .order-archive-row > .order-row-actions {
+    transition: none;
+  }
+}
+
 .order-print {
   display: none;
 }

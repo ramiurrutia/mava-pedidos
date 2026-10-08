@@ -5,8 +5,8 @@ import Link from "next/link";
 import { Menu } from "@base-ui/react/menu";
 import { useDraggable, useDroppable } from "@dnd-kit/react";
 import { pointerIntersection } from "@dnd-kit/collision";
-import { isMavaStockOrder, MAVA_STOCK_FOLDER_ID, MAVA_STOCK_SOURCE, type ClientFolder, type Order } from "../../../lib/orders";
-import { ArrowIcon, EditIcon, FolderIcon, MoreIcon, SpinnerIcon, TrashIcon } from "../icons";
+import { isMavaStockOrder, MAVA_STOCK_FOLDER_ID, MAVA_STOCK_SOURCE, type ClientFolder, type Order, type OrderStatus } from "../../../lib/orders";
+import { ArchiveIcon, ArrowIcon, CheckIcon, EditIcon, FolderIcon, MoreIcon, RestoreIcon, SpinnerIcon, TrashIcon } from "../icons";
 import { useOrdersWorkspace } from "./use-orders-workspace";
 import { MoveOrderDialog } from "./move-order-dialog";
 import { DeleteOrderDialog } from "./delete-order-dialog";
@@ -38,10 +38,31 @@ export function OrderMoveRow({ order, className, children }: { order: Order; cla
   const [moving, setMoving] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [pressing, setPressing] = useState(false);
+  const [archiving, setArchiving] = useState(false);
+  const [archiveSaved, setArchiveSaved] = useState(false);
+  const archiveInFlight = useRef(false);
+  const rowElement = useRef<HTMLDivElement | null>(null);
+  const exitAnimation = useRef<Animation | null>(null);
+  useEffect(() => () => { exitAnimation.current?.cancel(); }, []);
   const pressOrigin = useRef<{ x: number; y: number } | null>(null);
   const { pendingMove } = useOrderDrag();
-  const { dataSource } = useOrdersWorkspace();
-  const disabled = Boolean(pendingMove) || dataSource !== "supabase" || moving || confirmingDelete;
+  const { dataSource, updateStatus } = useOrdersWorkspace();
+  const disabled = Boolean(pendingMove) || dataSource !== "supabase" || moving || confirmingDelete || archiving;
+  async function toggleArchived() {
+    if (archiveInFlight.current) return;
+    archiveInFlight.current = true;
+    setArchiving(true);
+    const status = order.status === "Archivado" ? "Pendiente" : "Archivado";
+    try {
+      await updateStatus(order.id, status, async () => {
+        setArchiveSaved(true);
+        const row = rowElement.current;
+        if (!row?.isConnected || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+        exitAnimation.current = animateArchivedRow(row, status);
+        await exitAnimation.current.finished;
+      });
+    } finally { archiveInFlight.current = false; setArchiving(false); setArchiveSaved(false); }
+  }
   const { ref, handleRef, isDragging, isDropping } = useDraggable({
     id: `order:${order.id}`,
     type: "order",
@@ -65,11 +86,13 @@ export function OrderMoveRow({ order, className, children }: { order: Order; cla
   return (
     <>
       <div
-        ref={ref}
-        aria-busy={saving}
-        className={`${className} relative transition-[background-color,opacity] duration-200 motion-reduce:transition-none ${isDragging || isDropping || saving ? "!bg-[#eef4ee] opacity-45" : ""}`}
+        ref={(element) => { rowElement.current = element; ref(element); }}
+        aria-busy={saving || archiving}
+        data-archiving={archiving || undefined}
+        className={`${className} order-archive-row relative transition-[background-color,opacity] duration-200 motion-reduce:transition-none ${isDragging || isDropping || saving ? "!bg-[#eef4ee] opacity-45" : ""}`}
       >
         <Link ref={handleRef} href={href} aria-label={`Abrir ${order.code} de ${order.clientName}`} title="Tocá para abrir. Mantené apretado 1 segundo para mover." className="absolute inset-0 select-none rounded-lg [-webkit-touch-callout:none] focus-visible:outline-2 focus-visible:outline-[#235c4c]" draggable={false}
+          onClick={(event) => { if (archiving) event.preventDefault(); }}
           onPointerDown={(event) => {
             if (disabled || event.button !== 0 || !event.isPrimary) return;
             pressOrigin.current = { x: event.clientX, y: event.clientY };
@@ -86,12 +109,44 @@ export function OrderMoveRow({ order, className, children }: { order: Order; cla
         />
         <span aria-hidden="true" className={`pointer-events-none absolute inset-x-0 bottom-0 h-0.5 origin-left bg-[#3f765f] ${pressing && !isDragging ? "scale-x-100 transition-transform duration-1000 ease-linear motion-reduce:transition-none" : "scale-x-0"}`} />
         {children}
-        <RowMenu label={order.code} href={href} disabled={disabled} onMove={() => setMoving(true)} onDelete={() => setConfirmingDelete(true)} />
+        <div className="order-row-actions relative z-10 col-start-[-2] row-start-1 flex items-center gap-1 justify-self-end">
+          <button
+            type="button"
+            title={order.status === "Archivado" ? "Desarchivar pedido" : "Archivar pedido"}
+            aria-label={`${order.status === "Archivado" ? "Desarchivar" : "Archivar"} pedido ${order.code}`}
+            disabled={disabled}
+            onClick={() => void toggleArchived()}
+            className="grid size-11 shrink-0 place-items-center rounded-xl text-[#68726d] transition-colors hover:bg-[#edf3ef] hover:text-[#235c4c] focus-visible:outline-2 focus-visible:outline-[#235c4c] disabled:cursor-wait disabled:opacity-50 [&_svg]:size-5"
+          >
+            {order.status === "Archivado" ? <RestoreIcon /> : <ArchiveIcon />}
+          </button>
+          <RowMenu label={order.code} href={href} disabled={disabled} onMove={() => setMoving(true)} onDelete={() => setConfirmingDelete(true)} />
+        </div>
+        {archiving && <div role="status" className="absolute inset-0 z-20 flex items-center justify-center gap-2 rounded-lg bg-[#edf5ef]/40 text-sm font-semibold text-[#235c4c]">
+          {archiveSaved ? <CheckIcon className="size-5" /> : <SpinnerIcon className="size-5 animate-spin motion-reduce:animate-none" />}
+          {archiveSaved ? (order.status === "Archivado" ? "Pedido desarchivado" : "Pedido archivado") : (order.status === "Archivado" ? "Desarchivando…" : "Archivando…")}
+        </div>}
       </div>
       {moving && <MoveOrderDialog order={order} onClose={() => setMoving(false)} />}
       {confirmingDelete && <DeleteOrderDialog order={order} onClose={() => setConfirmingDelete(false)} />}
     </>
   );
+}
+
+function animateArchivedRow(row: HTMLElement, status: OrderStatus): Animation {
+  const height = `${row.getBoundingClientRect().height}px`;
+  const padding = getComputedStyle(row);
+  const animation = row.animate([
+    { height, paddingTop: padding.paddingTop, paddingBottom: padding.paddingBottom, opacity: 1, transform: "translateX(0)", overflow: "hidden", offset: 0 },
+    { height, paddingTop: padding.paddingTop, paddingBottom: padding.paddingBottom, opacity: 1, transform: "translateX(0)", overflow: "hidden", offset: 0.4, easing: "cubic-bezier(.22,1,.36,1)" },
+    { height: "0px", minHeight: "0px", paddingTop: "0px", paddingBottom: "0px", borderBottomWidth: "0px", opacity: 0, transform: `translateX(${status === "Archivado" ? 28 : -28}px)`, overflow: "hidden", offset: 1 },
+  ], { duration: 650, easing: "linear", fill: "forwards" });
+  document.querySelector<HTMLElement>(`[data-order-status-folder="${status}"]`)?.animate([
+    { boxShadow: "0 0 0 0 rgb(35 92 76 / 0)", backgroundColor: "#ffffff" },
+    { boxShadow: "0 0 0 5px rgb(35 92 76 / .14)", backgroundColor: "#e4f1e8", offset: 0.55 },
+    { boxShadow: "0 0 0 0 rgb(35 92 76 / 0)", backgroundColor: "#ffffff" },
+  ], { duration: 800, easing: "ease-out" });
+  return animation;
 }
 
 function useFolderDrop(folder: ClientFolder) {

@@ -45,7 +45,7 @@ export async function importDocumentOrder(input: DocumentImportInput, onProgress
     if (error.code === "PGRST202" || error.code === "42883") throw new DocumentImportError(`Falta aplicar la migración ${excel ? "de importación de Excel" : "20260930_order_pdf_management.sql"} en Supabase. No se creó ningún pedido.`, undefined, true);
     if (error.message.includes("PDF_DOCUMENT_LIMIT")) throw new DocumentImportError("No se pueden agregar más archivos a este pedido. Quitá alguno antes de continuar.", undefined, true);
     if (error.message.includes("PDF_DOCUMENT_DELETED")) throw new DocumentImportError("Ese PDF ya fue eliminado del pedido. No se restauraron sus imágenes.", undefined, true);
-    if (error.message.includes("PDF_ORDER_NOT_ACTIVE")) throw new DocumentImportError("El pedido está cerrado. Volvé a un estado activo para agregar PDFs.", undefined, true);
+    if (error.message.includes("PDF_ORDER_NOT_ACTIVE")) throw new DocumentImportError("El pedido está archivado. Desarchivalo para agregar PDFs.", undefined, true);
     if (error.message.includes("PDF_INITIAL_IMPORT_INCOMPLETE")) throw new DocumentImportError("Primero completá la importación original de este pedido.", undefined, true);
     if (error.message.includes("INVALID_PDF_IMAGES")) throw new DocumentImportError("No se pueden agregar tantas imágenes al pedido. Revisá las cantidades e intentá nuevamente.", undefined, true);
     if (error.message.includes("PDF_ALREADY_IN_ANOTHER_IMPORT")) throw new DocumentImportError("Uno de los PDFs ya está importado o pertenece a otra importación. Quitalo de esta selección; no se creó ningún pedido nuevo.", undefined, true);

@@ -3,7 +3,7 @@ import { CheckIcon, FolderIcon, ImageIcon } from "../icons";
 import { OrderMoveRow } from "./order-folder-actions";
 import { formatDate, statusStyles, ui } from "./shared";
 
-export const orderListGrid = "grid grid-cols-[minmax(0,1fr)_44px] items-center gap-x-3 @min-[680px]:grid-cols-[minmax(0,1fr)_136px_76px_44px]";
+export const orderListGrid = "grid grid-cols-[minmax(0,1fr)_92px] items-center gap-x-3 @min-[680px]:grid-cols-[minmax(0,1fr)_136px_76px_92px]";
 
 export function OrderListRow({ order, showFolder = true }: { order: Order; showFolder?: boolean }) {
   const { ready, total } = getOrderArtworkProgress(order);

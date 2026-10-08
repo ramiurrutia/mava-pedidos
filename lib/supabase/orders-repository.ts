@@ -13,7 +13,7 @@ import { getImageTitle } from "../image-title";
 
 const IMAGE_BUCKET = "order-images";
 
-type DatabaseStatus = "pending" | "in_production" | "finished" | "delivered";
+type DatabaseStatus = "pending" | "in_production" | "finished" | "delivered" | "cancelled" | "archived";
 
 type ImageRow = {
   id: string;
@@ -80,16 +80,16 @@ export type OrderDetailsInput = {
 
 const fromDatabaseStatus: Record<DatabaseStatus, OrderStatus> = {
   pending: "Pendiente",
-  in_production: "En producción",
-  finished: "Terminado",
-  delivered: "Entregado",
+  in_production: "Pendiente",
+  finished: "Pendiente",
+  delivered: "Pendiente",
+  cancelled: "Pendiente",
+  archived: "Archivado",
 };
 
 const toDatabaseStatus: Record<OrderStatus, DatabaseStatus> = {
   Pendiente: "pending",
-  "En producción": "in_production",
-  Terminado: "finished",
-  Entregado: "delivered",
+  Archivado: "archived",
 };
 
 const fromDatabasePreparationStatus: Record<DatabasePreparationStatus, ArtworkPreparationStatus> = {
@@ -281,13 +281,13 @@ export async function createRemoteOrder(clientName: string, notes: string, canva
 
 export async function updateRemoteOrderStatus(orderId: string, status: OrderStatus) {
   const supabase = createClient();
-  const { error } = await supabase
-    .from("orders")
-    .update({ status: toDatabaseStatus[status] })
-    .eq("id", orderId)
-    .is("deleted_at", null);
-
+  const { data, error } = await supabase.rpc("set_order_archive_status", {
+    requested_order_id: orderId,
+    requested_status: toDatabaseStatus[status],
+  });
+  if (error?.code === "PGRST202" || error?.code === "42883") throw new Error("Falta aplicar la migración 20261008_order_archive.sql en Supabase.");
   if (error) throw error;
+  if (data !== true) throw new Error("No se encontró el pedido.");
 }
 
 export async function moveRemoteOrder(orderId: string, folderId: string | null) {

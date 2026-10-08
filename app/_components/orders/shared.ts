@@ -4,13 +4,11 @@ export type DashboardView = "resumen" | "pedidos" | "carpetas" | "nuevo" | "subi
 export type WorkspaceView = Extract<DashboardView, "resumen" | "pedidos" | "carpetas">;
 export type DataSource = "loading" | "supabase" | "error";
 
-export const statuses: OrderStatus[] = ["Pendiente", "En producción", "Terminado", "Entregado"];
+export const statuses: OrderStatus[] = ["Pendiente", "Archivado"];
 
 export const statusStyles: Record<OrderStatus, string> = {
   Pendiente: "text-[#9a5b32] bg-[#fbede2]",
-  "En producción": "text-[#356753] bg-[#e4eee8]",
-  Terminado: "text-[#65597d] bg-[#eeeaf5]",
-  Entregado: "text-[#63706a] bg-[#edf0ee]",
+  Archivado: "text-[#63706a] bg-[#edf0ee]",
 };
 
 export const ui = {

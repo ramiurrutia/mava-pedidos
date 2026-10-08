@@ -95,10 +95,10 @@ export function OrdersDashboard({
       ) : view === "pedido" && routeOrder ? (
         <OrderPage
           onAddImages={(uploads) => workspace.uploadImagesToFolder(routeOrder.clientId, uploads, routeOrder.id)}
-          onClose={() => router.replace("/pedidos")}
+          onClose={() => router.replace(routeOrder.status === "Archivado" ? "/pedidos/archivados" : "/pedidos")}
           onDelete={async () => {
             const deleted = await workspace.deleteOrder(routeOrder.id);
-            if (deleted) router.replace("/pedidos");
+            if (deleted) router.replace(routeOrder.status === "Archivado" ? "/pedidos/archivados" : "/pedidos");
             return deleted;
           }}
           onEdit={(details) => workspace.updateOrderDetails(routeOrder.id, details)}
@@ -107,7 +107,11 @@ export function OrdersDashboard({
           onDeletePdf={(hash) => workspace.deletePdfDocument(routeOrder.id, hash)}
           onCanvasesOrderedChange={(value) => workspace.updateCanvasesOrdered(routeOrder.id, value)}
           onArtworkPreparationChange={(artworkKey, status) => workspace.updateArtworkPreparation(routeOrder.id, artworkKey, status)}
-          onStatusChange={(status) => workspace.updateStatus(routeOrder.id, status)}
+          onStatusChange={async (status) => {
+            const changed = await workspace.updateStatus(routeOrder.id, status);
+            if (changed) router.replace("/pedidos");
+            return changed;
+          }}
           order={routeOrder}
         />
       ) : view === "carpeta" && routeFolder ? (
@@ -115,7 +119,7 @@ export function OrdersDashboard({
           folder={routeFolder}
           onClose={() => router.replace("/carpetas")}
           orders={workspace.orders
-            .filter((order) => getOrderFolderId(order) === routeFolder.id)
+            .filter((order) => order.status === "Pendiente" && getOrderFolderId(order) === routeFolder.id)
             .sort((left, right) => Date.parse(right.createdAt) - Date.parse(left.createdAt))}
         />
       ) : (

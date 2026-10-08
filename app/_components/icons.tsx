@@ -6,6 +6,8 @@ export {
   FiImage as ImageIcon,
   FiFileText as FileIcon,
   FiFolder as FolderIcon,
+  FiArchive as ArchiveIcon,
+  FiRotateCcw as RestoreIcon,
   FiMoreHorizontal as MoreIcon,
   FiChevronRight as ArrowIcon,
   FiArrowLeft as BackIcon,

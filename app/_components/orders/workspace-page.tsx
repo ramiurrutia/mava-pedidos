@@ -15,6 +15,7 @@ import {
 } from "../../../lib/orders";
 import {
   ArrowIcon,
+  ArchiveIcon,
   BellIcon,
   CloseIcon,
   FolderIcon,
@@ -45,26 +46,27 @@ export function WorkspacePage({
   dataSource: DataSource;
   initialStatus?: OrderStatus;
 }) {
-  const [queries, setQueries] = useState<Partial<Record<WorkspaceView, string>>>({});
-  const query = queries[view] ?? "";
-  const activeStatus: OrderStatus | "Todos" = initialStatus ?? "Todos";
+  const [queries, setQueries] = useState<Record<string, string>>({});
+  const activeStatus: OrderStatus = initialStatus ?? "Pendiente";
+  const searchKey = view === "pedidos" ? `${view}-${activeStatus}` : view;
+  const query = queries[searchKey] ?? "";
 
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
       try {
-        const savedQuery = window.sessionStorage.getItem(`mava-search-${view}`) ?? "";
-        setQueries((current) => current[view] === savedQuery ? current : { ...current, [view]: savedQuery });
+        const savedQuery = window.sessionStorage.getItem(`mava-search-${searchKey}`) ?? "";
+        setQueries((current) => current[searchKey] === savedQuery ? current : { ...current, [searchKey]: savedQuery });
       } catch {
         // La búsqueda sigue funcionando aunque el navegador bloquee sessionStorage.
       }
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [view]);
+  }, [searchKey]);
 
   function setQuery(value: string) {
-    setQueries((current) => ({ ...current, [view]: value }));
+    setQueries((current) => ({ ...current, [searchKey]: value }));
     try {
-      window.sessionStorage.setItem(`mava-search-${view}`, value);
+      window.sessionStorage.setItem(`mava-search-${searchKey}`, value);
     } catch {
       // El estado en memoria mantiene la búsqueda durante esta navegación.
     }
@@ -73,7 +75,7 @@ export function WorkspacePage({
   const filteredOrders = useMemo(() => {
     const normalized = normalizeSearch(query);
     return orders.filter((order) => {
-      const matchesStatus = activeStatus === "Todos" || order.status === activeStatus;
+      const matchesStatus = order.status === activeStatus;
       const matchesQuery = !normalized || matchesSearch(getOrderSearchIndex(order), normalized);
       return matchesStatus && matchesQuery;
     });
@@ -129,7 +131,7 @@ export function WorkspacePage({
     return showMavaFolder ? [mavaFolder, ...clientFolders] : clientFolders;
   }, [filteredOrders, folders, orders, query]);
   const recentOrders = useMemo(
-    () => [...orders]
+    () => orders.filter((order) => isOrderActive(order.status))
       .sort((left, right) => Date.parse(right.createdAt) - Date.parse(left.createdAt)),
     [orders],
   );
@@ -139,7 +141,7 @@ export function WorkspacePage({
       <header className={`${ui.topbar} ${view === "resumen" ? "mb-4 shrink-0" : ""}`}>
         <div>
           <h1 className={ui.h1}>
-            {view === "pedidos" ? "Pedidos" : view === "carpetas" ? "Carpetas" : "Resumen"}
+            {view === "pedidos" ? statusFolderNames[activeStatus] : view === "carpetas" ? "Carpetas" : "Resumen"}
           </h1>
           <ConnectionStatus dataSource={dataSource} />
         </div>
@@ -156,8 +158,8 @@ export function WorkspacePage({
         />
       )}
 
-      {view === "resumen" && !query.trim() && (
-        <StatusFolders dataSource={dataSource} orders={orders} />
+      {((view === "resumen" && !query.trim()) || view === "pedidos") && (
+        <StatusFolders dataSource={dataSource} orders={orders} activeStatus={view === "pedidos" ? activeStatus : undefined} />
       )}
 
       {view === "resumen" && !query.trim() && (
@@ -167,15 +169,12 @@ export function WorkspacePage({
       {view !== "resumen" && <section aria-labelledby="orders-title">
         <div className={`${ui.sectionHeading} ${ui.ordersHeading}`}>
           <div>
-            <h2 className={ui.h2} id="orders-title">{view === "pedidos" ? activeStatus === "Todos" ? "Todos los pedidos" : statusFolderNames[activeStatus] : "Carpetas"}</h2>
+            <h2 className={ui.h2} id="orders-title">{view === "pedidos" ? statusFolderNames[activeStatus] : "Carpetas"}</h2>
             <p className="mt-1 text-[11px] text-[#7b8580]">
-              {view === "pedidos" ? `${filteredOrders.length} pedidos encontrados` : "Pedidos agrupados por carpeta y origen"}
+              {view === "pedidos" ? `${filteredOrders.length} ${filteredOrders.length === 1 ? "pedido encontrado" : "pedidos encontrados"}` : "Pedidos agrupados por carpeta y origen"}
             </p>
           </div>
           <div className="flex items-center justify-end gap-3 max-[680px]:w-full">
-            {view === "pedidos" && activeStatus !== "Todos" && (
-              <Link className={`${ui.textButton} shrink-0 no-underline`} href="/pedidos">Ver todos</Link>
-            )}
             <label className={`${ui.searchBox} w-full! min-[681px]:w-72!`}>
               <SearchIcon />
               <span className="sr-only">{view === "pedidos" ? "Buscar pedidos" : "Buscar carpetas"}</span>
@@ -189,7 +188,8 @@ export function WorkspacePage({
           </div>
         </div>
 
-        {view === "pedidos" && <FolderDropTargets />}
+        {view === "pedidos" && activeStatus === "Pendiente" && <FolderDropTargets />}
+        {view === "pedidos" && activeStatus === "Archivado" && <p className="mb-3 text-xs text-[#68726d]">Los pedidos archivados conservan sus imágenes y notas. Podés desarchivarlos desde sus acciones.</p>}
         <div className={`${ui.orderList} @container`}>
           {dataSource === "loading" ? (
             <LoadingWorkspace />
@@ -326,9 +326,11 @@ function GlobalSearchResults({
 function StatusFolders({
   dataSource,
   orders,
+  activeStatus,
 }: {
   dataSource: DataSource;
   orders: Order[];
+  activeStatus?: OrderStatus;
 }) {
   const counts = Object.fromEntries(
     statuses.map((status) => [status, orders.filter((order) => order.status === status).length]),
@@ -338,24 +340,25 @@ function StatusFolders({
     <section className="mb-5 shrink-0" aria-labelledby="home-status-folders-title">
       <div className="mb-2.5 flex items-center justify-between gap-4">
         <div>
-          <h2 className="text-base font-semibold tracking-[-.02em]" id="home-status-folders-title">Etapas del trabajo</h2>
-          <p className="mt-0.5 text-[11px] text-[#7b8580]">Abrí una etapa para ver sus pedidos</p>
+          <h2 className="text-base font-semibold tracking-[-.02em]" id="home-status-folders-title">Carpetas de pedidos</h2>
+          <p className="mt-0.5 text-[11px] text-[#7b8580]">Subidos y archivados, por separado</p>
         </div>
-        <Link className={`${ui.textButton} no-underline`} href="/pedidos">Ver todos</Link>
       </div>
 
       <div className="grid grid-cols-2 gap-2">
-        {dataSource === "loading" ? Array.from({ length: 4 }, (_, index) => (
+        {dataSource === "loading" ? Array.from({ length: 2 }, (_, index) => (
           <div className="loading-skeleton h-16 rounded-xl border border-[#e4e6e3]" key={index} />
         )) : statuses.map((status) => (
           <Link
-            className="flex h-16 min-w-0 items-center gap-2.5 rounded-xl border border-[#e4e6e3] bg-white px-3 text-inherit no-underline transition-colors hover:border-[#b9c8c0] hover:bg-[#fafbf9] focus-visible:outline-2 focus-visible:outline-[#235c4c]"
-            href={`/pedidos?estado=${encodeURIComponent(status)}`}
+            className={`flex h-16 min-w-0 items-center gap-2.5 rounded-xl border bg-white px-3 text-inherit no-underline transition-colors hover:border-[#b9c8c0] hover:bg-[#fafbf9] focus-visible:outline-2 focus-visible:outline-[#235c4c] ${activeStatus === status ? "border-[#235c4c] ring-1 ring-[#235c4c]" : "border-[#e4e6e3]"}`}
+            href={status === "Archivado" ? "/pedidos/archivados" : "/pedidos"}
+            aria-current={activeStatus === status ? "page" : undefined}
+            data-order-status-folder={status}
             key={status}
           >
-            <span className={`${statusStyles[status]} grid size-9 shrink-0 place-items-center rounded-lg [&_svg]:size-4`}><FolderIcon /></span>
+            <span className={`${statusStyles[status]} grid size-9 shrink-0 place-items-center rounded-lg [&_svg]:size-4`}>{status === "Archivado" ? <ArchiveIcon /> : <FolderIcon />}</span>
             <span className="min-w-0 flex-1">
-              <strong className="block truncate text-xs font-semibold">{statusFolderNames[status]}</strong>
+              <strong className="block text-xs font-semibold leading-tight">{statusFolderNames[status]}</strong>
               <small className="mt-1 block truncate text-[11px] text-[#7b8580]">{counts[status]} pedido{counts[status] === 1 ? "" : "s"}</small>
             </span>
             <span className="shrink-0 text-[#a4aca8] [&_svg]:size-3"><ArrowIcon /></span>
@@ -367,10 +370,8 @@ function StatusFolders({
 }
 
 const statusFolderNames: Record<OrderStatus, string> = {
-  Pendiente: "Pendientes",
-  "En producción": "En producción",
-  Terminado: "Terminados",
-  Entregado: "Entregados",
+  Pendiente: "Pedidos subidos",
+  Archivado: "Pedidos archivados",
 };
 
 function RecentNotifications({
@@ -650,7 +651,7 @@ function FoldersList({ folders, isWorkspaceEmpty }: { folders: FolderSummary[]; 
             <span className="min-w-0"><strong>{folder.name.toLocaleUpperCase("es")}</strong><small>{folder.orderCount} pedido{folder.orderCount === 1 ? "" : "s"} {folder.sourceGroup ? (folder.orderCount === 1 ? "sincronizado" : "sincronizados") : "en la carpeta"}</small></span>
           </span>
           <span className={ui.statusCell}>
-            <span className={`${ui.statusPill} ${folder.pendingCount ? statusStyles.Pendiente : statusStyles.Entregado}`}>
+            <span className={`${ui.statusPill} ${folder.pendingCount ? statusStyles.Pendiente : statusStyles.Archivado}`}>
               <i />{folder.pendingCount ? `${folder.pendingCount} activo${folder.pendingCount === 1 ? "" : "s"}` : "Sin pedidos activos"}
             </span>
           </span>

@@ -127,7 +127,7 @@ export async function syncMavaStockOrders(): Promise<MavaStockSyncResult> {
         requested_whatsapp: order.whatsapp?.trim() || null,
         requested_items: items,
         requested_source_status: order.status?.trim() || "",
-        requested_status: mapSourceStatus(order.status),
+        requested_status: "pending",
         requested_total: order.total,
         requested_created_at: order.created_at,
         requested_notes: order.observations?.trim() || "",
@@ -208,18 +208,4 @@ function normalizeProductCode(value: string) {
 function storageFolderForCode(code: string) {
   const prefix = code.split("-")[0];
   return prefix === "TEXTURADO" ? "TEXTURADOS" : prefix;
-}
-
-function mapSourceStatus(value: string | null) {
-  const normalized = (value ?? "")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .trim()
-    .toLocaleLowerCase("es")
-    .replace(/[\s-]+/g, "_");
-
-  if (["en_produccion", "produccion", "procesando"].includes(normalized)) return "in_production";
-  if (["terminado", "finalizado", "listo"].includes(normalized)) return "finished";
-  if (["entregado", "completado"].includes(normalized)) return "delivered";
-  return "pending";
 }

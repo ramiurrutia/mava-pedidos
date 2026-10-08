@@ -1,4 +1,4 @@
-export type OrderStatus = "Pendiente" | "En producción" | "Terminado" | "Entregado";
+export type OrderStatus = "Pendiente" | "Archivado";
 export type ArtworkPreparationStatus = "Pendiente" | "Listo";
 
 export type ClientFolder = {
@@ -84,7 +84,7 @@ export function findLatestPendingOrder(orders: Order[], clientId: string) {
 }
 
 export function isOrderActive(status: OrderStatus) {
-  return status === "Pendiente" || status === "En producción";
+  return status === "Pendiente";
 }
 
 export function getOrderArtworkProgress(order: Order) {

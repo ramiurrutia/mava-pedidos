@@ -16,7 +16,7 @@ import {
   type PendingImageUpload,
 } from "../../../lib/orders";
 import type { OrderDetailsInput } from "../../../lib/supabase/orders-repository";
-import { BackIcon, CheckIcon, EditIcon, ImageIcon, MoreIcon, SpinnerIcon, TrashIcon, UploadIcon } from "../icons";
+import { ArchiveIcon, BackIcon, CheckIcon, EditIcon, ImageIcon, MoreIcon, RestoreIcon, SpinnerIcon, TrashIcon, UploadIcon } from "../icons";
 import { ArtworkLightbox, type ArtworkViewerEntry } from "./artwork-lightbox";
 import { ImageDescriptionEditor } from "./image-description-editor";
 import { ImagePasteArea } from "./image-paste-area";
@@ -25,7 +25,7 @@ import { OrderPdfAttachment } from "./order-pdf-attachment";
 import { ImportPdfPage } from "./import-pdf-page";
 import { OrderPrintButton } from "./order-print";
 import { DeleteImageDialog } from "./delete-image-dialog";
-import { formatCurrency, statuses, statusStyles, ui } from "./shared";
+import { formatCurrency, statusStyles, ui } from "./shared";
 
 export function OrderPage({
   order,
@@ -42,7 +42,7 @@ export function OrderPage({
 }: {
   order: Order;
   onClose: () => void;
-  onStatusChange: (status: OrderStatus) => void;
+  onStatusChange: (status: OrderStatus) => Promise<boolean>;
   onAddImages: (uploads: PendingImageUpload[]) => Promise<boolean>;
   onEdit: (input: OrderDetailsInput) => Promise<boolean>;
   onEditImageDetails: (imageId: string, details: ImageDetails) => Promise<ImageDetails | null>;
@@ -61,12 +61,21 @@ export function OrderPage({
   const [savingCanvasesOrdered, setSavingCanvasesOrdered] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [savingStatus, setSavingStatus] = useState(false);
+  const statusInFlight = useRef(false);
   const [actionsOpen, setActionsOpen] = useState(false);
   const [updatingArtworkKeys, setUpdatingArtworkKeys] = useState<Set<string>>(() => new Set());
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
   const [viewerEditing, setViewerEditing] = useState(false);
   const [imageToDelete, setImageToDelete] = useState<OrderImage | null>(null);
   const canAddImages = isOrderActive(order.status);
+  async function toggleArchived() {
+    if (statusInFlight.current) return;
+    statusInFlight.current = true;
+    setSavingStatus(true);
+    try { await onStatusChange(order.status === "Archivado" ? "Pendiente" : "Archivado"); }
+    finally { statusInFlight.current = false; setSavingStatus(false); }
+  }
   const artworkProgress = getOrderArtworkProgress(order);
   const viewerEntries: ArtworkViewerEntry[] = [
     ...order.images
@@ -237,26 +246,14 @@ export function OrderPage({
           </div>
         )}
         <div className={ui.orderContent}>
-          <fieldset className="order-1 grid gap-2">
-            <legend className="mb-1 text-[11px] font-semibold text-[#68726d]">Estado del pedido</legend>
-            <div className="grid grid-cols-4 gap-2 max-[620px]:grid-cols-2">
-              {statuses.map((status) => {
-                const selected = order.status === status;
-                return (
-                  <button
-                    aria-pressed={selected}
-                    className={`${statusStyles[status]} ${selected ? "border-current ring-2 ring-current/15" : "border-transparent opacity-65 hover:opacity-100"} inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border px-3 text-[11px] font-semibold transition-all focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#235c4c]`}
-                    key={status}
-                    onClick={() => onStatusChange(status)}
-                    type="button"
-                  >
-                    <i className="size-1.5 rounded-full bg-current" />
-                    {status}
-                  </button>
-                );
-              })}
-            </div>
-          </fieldset>
+          <div className="order-1 flex flex-wrap items-center justify-between gap-3">
+            <span className={`${ui.statusPill} ${statusStyles[order.status]}`}><i />{order.status}</span>
+            <button className={ui.secondaryButton} disabled={savingStatus || deleting || uploading} onClick={() => void toggleArchived()} type="button">
+              {savingStatus ? <SpinnerIcon className="animate-spin" /> : order.status === "Archivado" ? <RestoreIcon /> : <ArchiveIcon />}
+              {savingStatus ? "Guardando…" : order.status === "Archivado" ? "Desarchivar pedido" : "Archivar pedido"}
+            </button>
+            {order.status === "Archivado" && <p className="w-full text-xs text-[#68726d]">Este pedido está archivado. Desarchivalo para volver a agregar imágenes o PDFs.</p>}
+          </div>
           <button
             aria-pressed={order.canvasesOrdered}
             className={`${order.canvasesOrdered ? "border-[#a9c8b6] bg-[#edf5f0]" : "border-[#e4d9cf] bg-[#fffaf5]"} order-2 flex w-full items-center gap-3 rounded-xl border p-4 text-left transition-colors hover:border-[#8eaa9b] disabled:cursor-wait disabled:opacity-65`}
@@ -289,7 +286,7 @@ export function OrderPage({
           {!pendingUploads.length ? (
             <button className={`${ui.primaryButton} order-6 w-full`} disabled={uploading || !canAddImages} onClick={() => fileInput.current?.click()} type="button">
               <UploadIcon />
-              {canAddImages ? "Agregar imágenes" : "Pedido cerrado"}
+              {canAddImages ? "Agregar imágenes" : "Pedido archivado"}
             </button>
           ) : (
             <div className="order-6 grid gap-4 rounded-xl border border-[#dfe5e1] bg-[#fafbf9] p-4">

@@ -1,7 +1,5 @@
 import { OrdersDashboard } from "../_components/orders-dashboard";
-import type { OrderStatus } from "../../lib/orders";
-
-const validStatuses: OrderStatus[] = ["Pendiente", "En producción", "Terminado", "Entregado"];
+import { redirect } from "next/navigation";
 
 export default async function OrdersPage({
   searchParams,
@@ -9,9 +7,6 @@ export default async function OrdersPage({
   searchParams: Promise<{ estado?: string | string[] }>;
 }) {
   const requestedStatus = (await searchParams).estado;
-  const status = typeof requestedStatus === "string" && validStatuses.includes(requestedStatus as OrderStatus)
-    ? requestedStatus as OrderStatus
-    : undefined;
-
-  return <OrdersDashboard initialStatus={status} view="pedidos" />;
+  if (requestedStatus === "Archivado") redirect("/pedidos/archivados");
+  return <OrdersDashboard initialStatus="Pendiente" view="pedidos" />;
 }

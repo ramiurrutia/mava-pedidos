@@ -50,6 +50,7 @@ function useOrdersWorkspaceState() {
   const syncPromise = useRef<Promise<boolean> | null>(null);
   const lastSyncAt = useRef(0);
   const movingOrders = useRef(new Set<string>());
+  const changingStatuses = useRef(new Set<string>());
   const deletingImages = useRef(new Set<string>());
   const deletedImageIds = useRef(new Set<string>());
 
@@ -249,42 +250,27 @@ function useOrdersWorkspaceState() {
     return order.id;
   }
 
-  async function updateStatus(id: string, status: OrderStatus) {
-    if (dataSource !== "supabase") return;
-    const previousOrder = orders.find((order) => order.id === id);
-    if (!previousOrder) return;
-    const completesOrder = status === "Terminado" || status === "Entregado";
-    setOrders((currentOrders) => currentOrders.map((order) => (
-      order.id === id ? {
-        ...order,
-        status,
-        canvasesOrdered: completesOrder ? true : order.canvasesOrdered,
-        images: completesOrder
-          ? order.images.map((image) => ({ ...image, preparationStatus: "Listo" }))
-          : order.images,
-        items: completesOrder
-          ? order.items?.map((item) => ({ ...item, preparationStatus: "Listo" }))
-          : order.items,
-      } : order
-    )));
-
+  async function updateStatus(id: string, status: OrderStatus, afterSave?: () => Promise<void>) {
+    if (dataSource !== "supabase" || changingStatuses.current.has(id)) return false;
+    const order = orders.find((order) => order.id === id);
+    if (!order) return false;
+    if (order.status === status) return true;
+    changingStatuses.current.add(id);
     try {
       await updateRemoteOrderStatus(id, status);
-      if (completesOrder) {
-        sileo.success({
-          title: "Pedido completado",
-          description: "Las telas quedaron pedidas y todos los cuadros se marcaron como listos.",
-        });
-      }
-    } catch {
-      setOrders((currentOrders) => currentOrders.map((order) => (
-        order.id === id ? previousOrder : order
-      )));
-      sileo.error({
-        title: "No se pudo cambiar el estado",
-        description: "El pedido, las telas y los cuadros volvieron a su estado anterior.",
-      });
-    }
+      // Only show the exit animation once the server confirms the change.
+      // A cancelled animation must never turn a saved change into an error.
+      if (afterSave) await afterSave().catch(() => {});
+      // Wait for an older refresh so it cannot restore the previous status after this change.
+      await refreshPromise.current;
+      setOrders((current) => current.map((order) => order.id === id ? { ...order, status } : order));
+      sileo.success({ title: status === "Archivado" ? "Pedido archivado" : "Pedido desarchivado",
+        description: status === "Archivado" ? "Lo encontrás en Pedidos archivados." : "El pedido volvió a Pedidos subidos." });
+      return true;
+    } catch (error) {
+      sileo.error({ title: "No se pudo cambiar el estado", description: error instanceof Error ? error.message : "Intentá nuevamente." });
+      return false;
+    } finally { changingStatuses.current.delete(id); }
   }
 
   async function updateCanvasesOrdered(id: string, canvasesOrdered: boolean) {
