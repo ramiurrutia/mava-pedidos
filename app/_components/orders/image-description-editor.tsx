@@ -17,6 +17,13 @@ export function ImageDescriptionEditor({
   disabled?: boolean;
 }) {
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [previousUploads, setPreviousUploads] = useState(uploads);
+  if (uploads !== previousUploads) {
+    setPreviousUploads(uploads);
+    if (uploads.some((upload) => !previousUploads.some((previous) => previous.file === upload.file))) {
+      setSelectedIndex(0);
+    }
+  }
   const currentIndex = Math.min(selectedIndex, Math.max(uploads.length - 1, 0));
   const current = uploads[currentIndex];
 

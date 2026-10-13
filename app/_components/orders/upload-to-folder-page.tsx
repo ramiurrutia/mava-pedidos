@@ -114,9 +114,9 @@ export function UploadToFolderPage({
                   {folders.map((folder) => <option value={folder.id} key={folder.id}>{folder.name.toLocaleUpperCase("es")}</option>)}
                 </select>
               </label>
-              <ImagePasteArea disabled={uploading} onImages={(files) => setUploads((current) => [...current, ...createPendingImageUploads(files)])}>
+              <ImagePasteArea disabled={uploading} onImages={(files) => setUploads((current) => [...createPendingImageUploads(files), ...current])}>
               <div className={ui.uploadZone}>
-                <input ref={fileInput} type="file" accept="image/*" multiple hidden onChange={(event) => { const files = Array.from(event.target.files ?? []); setUploads((current) => [...current, ...createPendingImageUploads(files)]); event.target.value = ""; }} />
+                <input ref={fileInput} type="file" accept="image/*" multiple hidden onChange={(event) => { const files = Array.from(event.target.files ?? []); setUploads((current) => [...createPendingImageUploads(files), ...current]); event.target.value = ""; }} />
                 <UploadIcon />
                 <strong>{uploads.length ? `${uploads.length} imagen${uploads.length === 1 ? "" : "es"} lista${uploads.length === 1 ? "" : "s"}` : "Seleccioná las imágenes"}</strong>
                 <span>En el próximo paso podrás editar el título y la descripción de cada imagen.</span>
@@ -126,7 +126,7 @@ export function UploadToFolderPage({
               </ImagePasteArea>
             </>
           ) : step === 2 ? (
-            <ImagePasteArea disabled={uploading} onImages={(files) => setUploads((current) => [...current, ...createPendingImageUploads(files)])}>
+            <ImagePasteArea disabled={uploading} onImages={(files) => setUploads((current) => [...createPendingImageUploads(files), ...current])}>
               <ImageDescriptionEditor disabled={uploading} onChange={(next) => { setUploads(next); if (!next.length) setStep(1); }} uploads={uploads} />
             </ImagePasteArea>
           ) : (

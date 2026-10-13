@@ -17,7 +17,78 @@ export function parsePdfOrder(pages: PdfPageData[]): ParsedPdfOrder {
   if (pages.some((page) => page.texts.some((text) => normalize(text.text).replace(/\s*\/\s*/g, "/") === "cantidad/producto"))) return parseMavaQrPdf(pages);
   // Keep the original table parser (and product ordering) for existing imports.
   const hasMavaTable = pages.some((page) => ["descripcion", "imagen", "cantidad"].every((label) => page.texts.some((text) => normalize(text.text) === label)));
-  return hasMavaTable ? parseMavaPdf(pages) : parseIllustratedList(pages);
+  if (hasMavaTable) return parseMavaPdf(pages);
+  const hasRemitoTable = pages.some((page) => ["productos", "imagen", "precio unitario"].every((label) => page.texts.some((text) => normalize(text.text) === label)));
+  return hasRemitoTable ? parseRemitoPdf(pages) : parseIllustratedList(pages);
+}
+
+function parseRemitoPdf(pages: PdfPageData[]): ParsedPdfOrder {
+  const result: ParsedPdfOrder = { clientName: "", email: "", phone: "", address: "", locality: "", products: [], declaredTotal: null, warnings: [] };
+  const first = pages[0]?.texts ?? [];
+  const field = (label: string) => {
+    const heading = first.find((text) => normalize(text.text).startsWith(`${label}:`));
+    if (!heading) return "";
+    const line = first.filter((text) => text !== heading && Math.abs(text.y - heading.y) < 3 && text.x > heading.x)
+      .sort((a, b) => a.x - b.x);
+    // Stop at the next labeled field, including when this field has no value.
+    const nextLabel = line.findIndex((text) => text.text.includes(":"));
+    const value = [heading.text.slice(heading.text.indexOf(":") + 1).trim(),
+      ...line.slice(0, nextLabel < 0 ? undefined : nextLabel).map((text) => text.text.trim())].filter(Boolean).join(" ");
+    return /^n\/?a$/i.test(value) ? "" : value;
+  };
+  result.clientName = field("nombre completo");
+  result.phone = field("telefono");
+  result.locality = field("localidad");
+  result.email = field("correo");
+  result.address = field("direccion");
+
+  for (const page of pages) {
+    const texts = page.texts.filter((text) => text.text.trim());
+    const header = texts.find((text) => normalize(text.text) === "productos");
+    const imageHeader = texts.find((text) => normalize(text.text) === "imagen");
+    const priceHeader = texts.find((text) => normalize(text.text) === "precio unitario");
+    if (!header || !imageHeader || !priceHeader) {
+      result.warnings.push(`No se reconoció la tabla en la página ${page.number}.`);
+      continue;
+    }
+    const footer = texts.filter((text) => text.y < header.y && /^(?:\d+\s+unidades?|total|sena|saldo)$/i.test(normalize(text.text)))
+      .sort((a, b) => b.y - a.y)[0];
+    const bottom = footer ? footer.y + footer.height : 0;
+    const top = header.y - 10;
+    const body = texts.filter((text) => text.y < top && text.y > bottom);
+    const anchors = body.filter((text) => Math.abs(text.x - header.x) < 4 && /^\d+$/.test(text.text.trim()))
+      .sort((a, b) => b.y - a.y);
+    const imageEnd = (imageHeader.x + imageHeader.width + priceHeader.x) / 2;
+    const columnImages = page.images.filter((image) => image.width >= 8 && image.height >= 8
+      && image.x + image.width / 2 > imageHeader.x - 20 && image.x + image.width / 2 < imageEnd
+      && image.y + image.height / 2 < top && image.y + image.height / 2 > bottom);
+    const imageStart = columnImages.length ? Math.min(...columnImages.map((image) => image.x)) - 4 : imageHeader.x - 20;
+    for (const [index, anchor] of anchors.entries()) {
+      // Quantities are centered vertically: the first description line is above them.
+      const center = anchor.y + anchor.height / 2;
+      const previous = anchors[index - 1], next = anchors[index + 1];
+      const upper = previous ? (center + previous.y + previous.height / 2) / 2 : top;
+      const lower = next ? (center + next.y + next.height / 2) / 2 : bottom;
+      const detail = body.filter((text) => text !== anchor && text.x >= header.x && text.x < imageStart
+        && text.y + text.height / 2 < upper && text.y + text.height / 2 >= lower)
+        .sort((a, b) => Math.abs(a.y - b.y) < 3 ? a.x - b.x : b.y - a.y)
+        .map((text) => text.text.trim()).join(" ");
+      const code = /^(.+?\([\w-]+\))\s*(.*)$/.exec(detail);
+      const product: PdfProduct = { key: `product-${result.products.length + 1}`, code: code?.[1] ?? `Imagen ${result.products.length + 1}`,
+        description: code?.[2] ?? detail, quantity: Number(anchor.text.trim()), unitPrice: 0 };
+      const images = columnImages.filter((image) => image.y + image.height / 2 < upper && image.y + image.height / 2 >= lower)
+        .sort((a, b) => b.width * b.height - a.width * a.height);
+      if (images[0]) product.image = { ...images[0], page: page.number };
+      else result.warnings.push(`No se pudo extraer la foto de ${detail || product.code}.`);
+      if (images.length > 1) result.warnings.push(`Revisá las imágenes de ${product.code}: se tomó la foto más grande de la fila.`);
+      if (!detail) result.warnings.push(`Revisá la descripción de ${product.code}.`);
+      if (!Number.isSafeInteger(product.quantity) || product.quantity < 1) result.warnings.push(`Revisá la cantidad de ${product.code}.`);
+      result.products.push(product);
+    }
+  }
+  if (!result.products.length) throw new Error(unrecognizedPdf);
+  if (!result.clientName) result.warnings.push("Completá el nombre del cliente.");
+  return result;
 }
 
 function parseMavaQrPdf(pages: PdfPageData[]): ParsedPdfOrder {

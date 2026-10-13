@@ -395,7 +395,8 @@ export async function uploadRemoteImages({
   const failedFiles: UploadFailure[] = [];
   let resolvedOrderId = orderId;
 
-  for (const item of uploads) {
+  // Save the first preview last so newest-first loading preserves the preview order.
+  for (const item of [...uploads].reverse()) {
     const { file } = item;
     let prepared: PreparedImageRow | undefined;
     try {

@@ -123,7 +123,7 @@ export function OrderPage({
 
   function selectImages(files: File[]) {
     if (!files.length || uploading || !canAddImages) return;
-    setPendingUploads((current) => [...current, ...createPendingImageUploads(files)]);
+    setPendingUploads((current) => [...createPendingImageUploads(files), ...current]);
   }
 
   async function addImages() {

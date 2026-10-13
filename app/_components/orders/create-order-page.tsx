@@ -120,14 +120,14 @@ export function CreateOrderPage({
               notes={notes}
               onClientNameChange={setClientName}
               onCanvasesOrderedChange={setCanvasesOrdered}
-              onFilesChange={(files) => setUploads((current) => [...current, ...createPendingImageUploads(files)])}
-              onPasteImages={(files) => setUploads((current) => [...current, ...createPendingImageUploads(files)])}
+              onFilesChange={(files) => setUploads((current) => [...createPendingImageUploads(files), ...current])}
+              onPasteImages={(files) => setUploads((current) => [...createPendingImageUploads(files), ...current])}
               onRemoveImage={(index) => setUploads((current) => current.filter((_, currentIndex) => currentIndex !== index))}
               onNotesChange={setNotes}
               uploads={uploads}
             />
           ) : step === 2 ? (
-            <ImagePasteArea disabled={saving} onImages={(files) => setUploads((current) => [...current, ...createPendingImageUploads(files)])}>
+            <ImagePasteArea disabled={saving} onImages={(files) => setUploads((current) => [...createPendingImageUploads(files), ...current])}>
               <ImageDescriptionEditor disabled={saving} onChange={(next) => { setUploads(next); if (!next.length) setStep(1); }} uploads={uploads} />
             </ImagePasteArea>
           ) : (
