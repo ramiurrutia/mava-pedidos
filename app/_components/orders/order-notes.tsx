@@ -1,4 +1,5 @@
 import { ui } from "./shared";
+import { AnimatedDisclosure } from "./animated-disclosure";
 
 export function OrderNotes({ notes, fromPdf }: { notes: string; fromPdf: boolean }) {
   // Old imports appended a generated section after the user's own notes.
@@ -11,10 +12,9 @@ export function OrderNotes({ notes, fromPdf }: { notes: string; fromPdf: boolean
       <span>Notas</span>
       <p className="whitespace-pre-wrap break-words">{visibleNotes || "Sin notas adicionales para este pedido."}</p>
       {importedDetails && (
-        <details className="mt-3 rounded-lg border border-[#e4e7e3] bg-[#fafbf9] px-3 py-2 text-xs text-[#68726d]">
-          <summary className="cursor-pointer py-1 font-medium focus-visible:outline-2 focus-visible:outline-[#235c4c]">Ver detalle de la importación anterior</summary>
+        <AnimatedDisclosure title="Ver detalle de la importación anterior" className="mt-3 rounded-lg border border-[#e4e7e3] bg-[#fafbf9] px-3 py-2 text-xs text-[#68726d]" triggerClassName="font-medium">
           <p className="mt-3 whitespace-pre-wrap break-words leading-relaxed">{importedDetails}</p>
-        </details>
+        </AnimatedDisclosure>
       )}
     </div>
   );

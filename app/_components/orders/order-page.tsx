@@ -27,6 +27,7 @@ import { ImportPdfPage } from "./import-pdf-page";
 import { OrderPrintButton } from "./order-print";
 import { DeleteImageDialog } from "./delete-image-dialog";
 import { ManualOrderItems } from "./manual-order-items";
+import { AnimatedDisclosure } from "./animated-disclosure";
 import { formatCurrency, statusStyles, ui } from "./shared";
 
 export function OrderPage({
@@ -365,11 +366,10 @@ export function OrderPage({
                     <div className="min-w-0 flex-1">
                       <h3 className="text-sm font-semibold text-[#29352f] [overflow-wrap:anywhere]">{image.title || `Imagen ${index + 1}`}</h3>
                       {image.description && <p className="mt-2 whitespace-pre-wrap text-xs leading-relaxed text-[#48564e] [overflow-wrap:anywhere]">{image.description}</p>}
-                      <details className="mt-2 text-xs text-[#79837c]">
-                        <summary className="cursor-pointer py-1 focus-visible:outline-2 focus-visible:outline-[#235c4c]">Archivo y fecha</summary>
+                      <AnimatedDisclosure title="Archivo y fecha" className="mt-2 text-xs text-[#79837c]">
                         <p className="mt-1 [overflow-wrap:anywhere]">{image.name}</p>
                         <time className="mt-1 block" dateTime={image.addedAt}>{new Intl.DateTimeFormat("es-AR", { dateStyle: "short", timeStyle: "short" }).format(new Date(image.addedAt))}</time>
-                      </details>
+                      </AnimatedDisclosure>
                     </div>
                   </div>
                   <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -410,13 +410,12 @@ export function OrderPage({
             ) }))}
             canAdd={canAddImages} onSave={onSaveManualItem} onDelete={onDeleteManualItem} onStatusChange={onArtworkPreparationChange}
           />
-          <details className="border-t border-[#e8ece7] pt-5" open={order.sourceSystem === "PDF" && order.sourceStatus !== "pdf_complete" || order.sourceSystem === "EXCEL" && order.sourceStatus !== "excel_complete"}>
-            <summary className="cursor-pointer py-1 text-sm font-semibold text-[#49594e] focus-visible:outline-2 focus-visible:outline-[#235c4c]">Documentos del pedido</summary>
+          <AnimatedDisclosure title="Documentos del pedido" className="border-t border-[#e8ece7] pt-5" triggerClassName="text-sm font-semibold text-[#49594e]" defaultOpen={order.sourceSystem === "PDF" && order.sourceStatus !== "pdf_complete" || order.sourceSystem === "EXCEL" && order.sourceStatus !== "excel_complete"}>
             <div className="mt-4 space-y-4">
               {order.sourceSystem === "EXCEL" && <OrderPdfAttachment key={`${order.id}-excel`} orderId={order.id} format="EXCEL" complete={order.sourceStatus === "excel_complete"} />}
               <OrderPdfAttachment key={`${order.id}-pdf`} orderId={order.id} complete={order.sourceSystem !== "PDF" || order.sourceStatus === "pdf_complete"} canAdd={canAddImages && (order.sourceSystem !== "EXCEL" || order.sourceStatus === "excel_complete")} onAdd={() => setAddingPdfs(true)} onDelete={onDeletePdf} />
             </div>
-          </details>
+          </AnimatedDisclosure>
         </div>
       </div>
 
