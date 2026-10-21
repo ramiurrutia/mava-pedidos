@@ -209,15 +209,15 @@ export function OrderPage({
     <section className={ui.pagePanel} aria-labelledby="order-title">
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <button className={ui.backButton} type="button" onClick={onClose}><BackIcon /> Volver</button>
-        <OrderPrintButton key={order.id} order={order} />
+        <OrderPrintButton compact key={order.id} order={order} />
       </div>
-      <div className={ui.pageCard}>
-        <div className={ui.pageHead}>
+      <div className="overflow-hidden rounded-2xl border border-[#e1e6e0] bg-white p-5 sm:p-7">
+        <div className="mb-6 flex items-start justify-between gap-4">
           <div>
-            <p className={ui.eyebrow}>{order.code}</p>
+            <p className={ui.eyebrow}>{order.code}{order.sourceSystem ? ` · ${order.sourceSystem}` : ""}</p>
             <div className="flex flex-wrap items-center gap-2.5">
-              <h2 id="order-title">{order.clientName}</h2>
-              {order.sourceSystem && <span className="rounded-full bg-[#e8f0eb] px-2.5 py-1 text-[14px] font-bold tracking-[.06em] text-[#235c4c]">{order.sourceSystem}</span>}
+              <h2 className="text-2xl font-semibold tracking-tight [overflow-wrap:anywhere]" id="order-title">{order.clientName}</h2>
+              <span className={`${ui.statusPill} ${statusStyles[order.status]}`}><i />{order.status}</span>
             </div>
           </div>
           <div className="relative">
@@ -251,52 +251,45 @@ export function OrderPage({
             </div>
           </div>
         )}
-        <div className={ui.orderContent}>
-          <div className="order-1 flex flex-wrap items-center justify-between gap-3">
-            <span className={`${ui.statusPill} ${statusStyles[order.status]}`}><i />{order.status}</span>
-            <button className={ui.secondaryButton} disabled={savingStatus || deleting || uploading} onClick={() => void toggleArchived()} type="button">
-              {savingStatus ? <SpinnerIcon className="animate-spin" /> : order.status === "Archivado" ? <RestoreIcon /> : <ArchiveIcon />}
-              {savingStatus ? "Guardando…" : order.status === "Archivado" ? "Desarchivar pedido" : "Archivar pedido"}
-            </button>
-            {order.status === "Archivado" && <p className="w-full text-xs text-[#68726d]">Este pedido está archivado. Desarchivalo para volver a agregar imágenes o PDFs.</p>}
-          </div>
+        <div className="space-y-6">
+          <dl className="grid grid-cols-2 gap-4 border-b border-[#e8ece7] pb-6 min-[480px]:grid-cols-3" aria-label="Datos del cliente">
+            <div className="col-span-2 min-w-0 min-[480px]:col-span-1"><dt className="text-xs text-[#79837c]">Contacto</dt><dd className="mt-1 text-sm font-medium text-[#29352f] [overflow-wrap:anywhere]">{order.contactName || order.clientName}</dd></div>
+            <div className="min-w-0"><dt className="text-xs text-[#79837c]">WhatsApp</dt><dd className="mt-1 text-sm font-medium text-[#29352f] [overflow-wrap:anywhere]">{order.whatsapp || "Sin registrar"}</dd></div>
+            <div className="min-w-0"><dt className="text-xs text-[#79837c]">Localidad</dt><dd className="mt-1 text-sm font-medium text-[#29352f] [overflow-wrap:anywhere]">{order.locality || "Sin registrar"}</dd></div>
+          </dl>
+          {order.notes.trim() && <OrderNotes notes={order.notes} fromPdf={order.sourceSystem === "PDF"} />}
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-4 border-b border-[#e8ece7] pb-6">
+            <div className="min-w-36 flex-1">
+              <div className="flex items-center justify-between gap-3 text-xs"><span className="font-medium text-[#49594e]">Preparación</span><strong className="font-semibold text-[#235c4c]">{artworkProgress.ready} / {artworkProgress.total} listos</strong></div>
+              <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#e7ece7]" role="progressbar" aria-label="Preparación del pedido" aria-valuenow={artworkProgress.percentage} aria-valuemin={0} aria-valuemax={100}>
+                <span className="block h-full rounded-full bg-[#3f765f] transition-[width] duration-300" style={{ width: `${artworkProgress.percentage}%` }} />
+              </div>
+            </div>
           <button
             aria-pressed={order.canvasesOrdered}
-            className={`${order.canvasesOrdered ? "border-[#a9c8b6] bg-[#edf5f0]" : "border-[#e4d9cf] bg-[#fffaf5]"} order-2 flex w-full items-center gap-3 rounded-xl border p-4 text-left transition-colors hover:border-[#8eaa9b] disabled:cursor-wait disabled:opacity-65`}
+            className={`${order.canvasesOrdered ? "text-[#276146]" : "text-[#68736d]"} inline-flex min-h-11 items-center gap-2 rounded-lg px-2 text-xs font-medium transition-colors hover:bg-[#f4f7f3] disabled:cursor-wait disabled:opacity-65`}
             disabled={savingCanvasesOrdered}
             onClick={() => void toggleCanvasesOrdered()}
             type="button"
           >
             <span className={`${order.canvasesOrdered ? "border-[#3f7c61] bg-[#3f7c61] text-white" : "border-[#b9b2aa] bg-white text-transparent"} grid size-6 shrink-0 place-items-center rounded-md border-2 transition-colors [&_svg]:size-4`}>{savingCanvasesOrdered ? <SpinnerIcon className="animate-spin text-[#3f7c61]" /> : <CheckIcon />}</span>
-            <span className="min-w-0">
-              <strong className="block text-xs font-semibold text-[#29352f]">Telas pedidas</strong>
-              <small className="mt-1 block text-[14px] leading-relaxed text-[#68736d]">
-                {order.canvasesOrdered ? "Las telas de este pedido ya fueron solicitadas." : "Todavía falta pedir las telas necesarias para preparar los cuadros."}
-              </small>
-            </span>
+            <span>{order.canvasesOrdered ? "Telas pedidas" : "Telas sin pedir"}</span>
           </button>
-          <div className="order-3 rounded-xl border border-[#dfe5e1] bg-[#f8faf8] p-4">
-            <div className="flex items-end justify-between gap-4">
-              <span>
-                <small className="block text-[14px] font-semibold text-[#68736d]">Preparación de cuadros</small>
-                <strong className="mt-1 block text-base font-semibold">{artworkProgress.total ? `${artworkProgress.ready} de ${artworkProgress.total} listos` : "Sin cuadros todavía"}</strong>
-              </span>
-              {artworkProgress.total > 0 && <strong className="text-sm font-semibold text-[#3f765f]">{artworkProgress.percentage}%</strong>}
-            </div>
-            <div className="mt-3 h-2 overflow-hidden rounded-full bg-[#dfe6e1]">
-              <span className="block h-full rounded-full bg-[#3f765f] transition-[width] duration-300" style={{ width: `${artworkProgress.percentage}%` }} />
-            </div>
+            <button className="inline-flex min-h-11 items-center gap-2 rounded-lg px-2 text-xs font-medium text-[#68736d] transition-colors hover:bg-[#f4f7f3] disabled:opacity-50 [&_svg]:size-4" disabled={savingStatus || deleting || uploading} onClick={() => void toggleArchived()} type="button">
+              {savingStatus ? <SpinnerIcon className="animate-spin" /> : order.status === "Archivado" ? <RestoreIcon /> : <ArchiveIcon />}
+              {savingStatus ? "Guardando…" : order.status === "Archivado" ? "Desarchivar" : "Archivar"}
+            </button>
           </div>
-          <ManualOrderItems items={order.manualItems ?? []} canAdd={canAddImages} onSave={onSaveManualItem} onDelete={onDeleteManualItem} onStatusChange={onArtworkPreparationChange} />
+          {order.status === "Archivado" && <p className="text-xs text-[#68726d]">Desarchivá el pedido para agregar imágenes, ítems o PDFs.</p>}
           <input ref={fileInput} type="file" accept="image/*" multiple hidden disabled={uploading || !canAddImages} onChange={(event) => { selectImages(Array.from(event.target.files ?? [])); event.target.value = ""; }} />
-          <ImagePasteArea className="order-6" disabled={uploading || !canAddImages} onImages={selectImages}>
+          <ImagePasteArea compact className="flex flex-wrap items-center gap-2" disabled={uploading || !canAddImages} onImages={selectImages}>
           {!pendingUploads.length ? (
-            <button className={`${ui.primaryButton} order-6 w-full`} disabled={uploading || !canAddImages} onClick={() => fileInput.current?.click()} type="button">
+            <button className={ui.primaryButton} disabled={uploading || !canAddImages} onClick={() => fileInput.current?.click()} type="button">
               <UploadIcon />
               {canAddImages ? "Agregar imágenes" : "Pedido archivado"}
             </button>
           ) : (
-            <div className="order-6 grid gap-4 rounded-xl border border-[#dfe5e1] bg-[#fafbf9] p-4">
+            <div className="grid w-full gap-4 rounded-xl border border-[#dfe5e1] bg-[#fafbf9] p-4">
               <ImageDescriptionEditor disabled={uploading || !canAddImages} onChange={setPendingUploads} uploads={pendingUploads} />
               <div className="flex flex-wrap justify-end gap-2">
                 <button className={ui.secondaryButton} disabled={uploading || !canAddImages} onClick={() => fileInput.current?.click()} type="button"><UploadIcon />Agregar más imágenes</button>
@@ -308,17 +301,6 @@ export function OrderPage({
             </div>
           )}
           </ImagePasteArea>
-          <div className={`${ui.safetyNote} order-7 -mt-2`}><span>✓</span><p><strong>Vinculado</strong>Las imágenes se vinculan a {order.code} mediante su ID.</p></div>
-          {(order.sourceSystem || order.contactName || order.whatsapp || order.locality) && (
-            <div className="order-9 grid grid-cols-2 gap-3 rounded-lg border border-[#e4e7e3] bg-[#fafbf9] p-3 max-[480px]:grid-cols-1">
-              <div className={ui.detailBlock}><span>Contacto</span><p>{order.contactName || "Sin nombre de contacto"}</p></div>
-              <div className={ui.detailBlock}><span>WhatsApp</span><p>{order.whatsapp || "Sin número registrado"}</p></div>
-              <div className={ui.detailBlock}><span>Localidad</span><p>{order.locality || "Sin localidad registrada"}</p></div>
-            </div>
-          )}
-            <OrderNotes notes={order.notes} fromPdf={order.sourceSystem === "PDF"} />
-            {order.sourceSystem === "EXCEL" && <OrderPdfAttachment key={`${order.id}-excel`} orderId={order.id} format="EXCEL" complete={order.sourceStatus === "excel_complete"} />}
-            <OrderPdfAttachment key={`${order.id}-pdf`} orderId={order.id} complete={order.sourceSystem !== "PDF" || order.sourceStatus === "pdf_complete"} canAdd={canAddImages && (order.sourceSystem !== "EXCEL" || order.sourceStatus === "excel_complete")} onAdd={() => setAddingPdfs(true)} onDelete={onDeletePdf} />
           {(order.items?.length ?? 0) > 0 && (
             <div className={`${ui.detailBlock} order-4`}>
               <div className={ui.detailTitle}>
@@ -365,10 +347,9 @@ export function OrderPage({
               </div>
             </div>
           )}
-          <div className={`${ui.detailBlock} order-5`}>
-            <div className={ui.detailTitle}><span>Imágenes agregadas</span><small>{order.images.length} archivos</small></div>
-            <ul aria-label="Imágenes del pedido" className="divide-y divide-[#e7e9e6] overflow-hidden rounded-lg border border-[#e4e7e3] bg-white">
-              {order.images.map((image, index) => (
+          <ManualOrderItems
+            items={order.manualItems ?? []}
+            imageItems={order.images.map((image, index) => ({ id: `image:${image.id}`, addedAt: image.addedAt, content: (
                 <li className="min-w-0 p-3 sm:p-4" key={image.id}>
                   <div className="flex items-start gap-3">
                     <button
@@ -383,18 +364,22 @@ export function OrderPage({
                     </button>
                     <div className="min-w-0 flex-1">
                       <h3 className="text-sm font-semibold text-[#29352f] [overflow-wrap:anywhere]">{image.title || `Imagen ${index + 1}`}</h3>
-                      <p className="mt-1 text-xs leading-relaxed text-[#68736d] [overflow-wrap:anywhere]"><span className="font-medium">Archivo: </span>{image.name}</p>
                       {image.description && <p className="mt-2 whitespace-pre-wrap text-xs leading-relaxed text-[#48564e] [overflow-wrap:anywhere]">{image.description}</p>}
-                      <time className="mt-2 block text-[14px] text-[#7b8580]" dateTime={image.addedAt}>{new Intl.DateTimeFormat("es-AR", { dateStyle: "short", timeStyle: "short" }).format(new Date(image.addedAt))}</time>
+                      <details className="mt-2 text-xs text-[#79837c]">
+                        <summary className="cursor-pointer py-1 focus-visible:outline-2 focus-visible:outline-[#235c4c]">Archivo y fecha</summary>
+                        <p className="mt-1 [overflow-wrap:anywhere]">{image.name}</p>
+                        <time className="mt-1 block" dateTime={image.addedAt}>{new Intl.DateTimeFormat("es-AR", { dateStyle: "short", timeStyle: "short" }).format(new Date(image.addedAt))}</time>
+                      </details>
                     </div>
                   </div>
                   <div className="mt-3 flex flex-wrap items-center gap-2">
                     <button
                       aria-label={`Editar título y descripción de ${image.title || image.name}`}
-                      className={ui.secondaryButton}
+                      title="Editar título y descripción"
+                      className="grid size-11 place-items-center rounded-xl text-[#68736d] transition-colors hover:bg-[#f0f4f0] focus-visible:outline-2 focus-visible:outline-[#235c4c] [&_svg]:size-4"
                       onClick={() => openImageViewer(image.id, true)}
                       type="button"
-                    ><EditIcon />Título y descripción</button>
+                    ><EditIcon /></button>
                     <button
                       aria-label={`Imagen lista: ${image.title || image.name}`}
                       aria-pressed={image.preparationStatus === "Listo"}
@@ -413,7 +398,7 @@ export function OrderPage({
                       aria-label={`Eliminar imagen ${image.title || image.name}`}
                       aria-haspopup="dialog"
                       title="Eliminar imagen"
-                      className="ml-auto grid size-11 shrink-0 cursor-pointer place-items-center rounded-xl border border-[#e5bcb5] bg-[#fff3f0] text-[#a34e42] shadow-sm transition hover:border-[#ce8d81] hover:bg-[#ffe6e0] motion-safe:active:scale-[.98] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#a34e42] disabled:cursor-not-allowed disabled:opacity-60 [&_svg]:size-5"
+                      className="ml-auto grid size-11 shrink-0 cursor-pointer place-items-center rounded-xl text-[#9a7168] transition hover:bg-[#fff3f0] hover:text-[#a34e42] motion-safe:active:scale-[.98] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#a34e42] disabled:cursor-not-allowed disabled:opacity-60 [&_svg]:size-4"
                       disabled={deleting || updatingArtworkKeys.has(image.preparationKey)}
                       onClick={() => setImageToDelete(image)}
                       type="button"
@@ -422,10 +407,16 @@ export function OrderPage({
                     </button>
                   </div>
                 </li>
-              ))}
-              {!order.images.length && <li className={ui.detailEmpty}>Todavía no hay imágenes.</li>}
-            </ul>
-          </div>
+            ) }))}
+            canAdd={canAddImages} onSave={onSaveManualItem} onDelete={onDeleteManualItem} onStatusChange={onArtworkPreparationChange}
+          />
+          <details className="border-t border-[#e8ece7] pt-5" open={order.sourceSystem === "PDF" && order.sourceStatus !== "pdf_complete" || order.sourceSystem === "EXCEL" && order.sourceStatus !== "excel_complete"}>
+            <summary className="cursor-pointer py-1 text-sm font-semibold text-[#49594e] focus-visible:outline-2 focus-visible:outline-[#235c4c]">Documentos del pedido</summary>
+            <div className="mt-4 space-y-4">
+              {order.sourceSystem === "EXCEL" && <OrderPdfAttachment key={`${order.id}-excel`} orderId={order.id} format="EXCEL" complete={order.sourceStatus === "excel_complete"} />}
+              <OrderPdfAttachment key={`${order.id}-pdf`} orderId={order.id} complete={order.sourceSystem !== "PDF" || order.sourceStatus === "pdf_complete"} canAdd={canAddImages && (order.sourceSystem !== "EXCEL" || order.sourceStatus === "excel_complete")} onAdd={() => setAddingPdfs(true)} onDelete={onDeletePdf} />
+            </div>
+          </details>
         </div>
       </div>
 

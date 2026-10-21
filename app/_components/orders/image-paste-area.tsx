@@ -6,8 +6,8 @@ import { imagesFromPaste, readClipboardImages } from "../../../lib/clipboard-ima
 import { ClipboardIcon, SpinnerIcon } from "../icons";
 import { ui } from "./shared";
 
-export function ImagePasteArea({ children, onImages, disabled = false, className = "" }: {
-  children: ReactNode; onImages: (files: File[]) => void; disabled?: boolean; className?: string;
+export function ImagePasteArea({ children, onImages, disabled = false, className = "", compact = false }: {
+  children: ReactNode; onImages: (files: File[]) => void; disabled?: boolean; className?: string; compact?: boolean;
 }) {
   const [reading, setReading] = useState(false);
   const [message, setMessage] = useState("");
@@ -57,12 +57,12 @@ export function ImagePasteArea({ children, onImages, disabled = false, className
         }}
       >
         {children}
-        {!disabled && <div className="mt-3 flex flex-col items-center gap-2 text-center">
+        {!disabled && <div className={compact ? "flex flex-wrap items-center gap-2" : "mt-3 flex flex-col items-center gap-2 text-center"}>
           <button className={ui.secondaryButton} disabled={reading} onClick={() => void pasteImage()} type="button">
             {reading ? <SpinnerIcon className="animate-spin" /> : <ClipboardIcon />}{reading ? "Leyendo imagen..." : "Pegar imagen"}
           </button>
-          <p className="text-[14px] leading-relaxed text-[#68726d]">También podés hacer clic derecho en esta zona o pegar con Ctrl+V.</p>
-          <p className="text-xs leading-relaxed text-[#68726d]" role="status" aria-live="polite">{message}</p>
+          <p className="text-[14px] leading-relaxed text-[#68726d]">{compact ? "o usá Ctrl+V" : "También podés hacer clic derecho en esta zona o pegar con Ctrl+V."}</p>
+          <p className={compact ? "basis-full text-xs leading-relaxed text-[#68726d] empty:hidden" : "text-xs leading-relaxed text-[#68726d]"} role="status" aria-live="polite">{message}</p>
         </div>}
       </ContextMenu.Trigger>
       <ContextMenu.Portal>

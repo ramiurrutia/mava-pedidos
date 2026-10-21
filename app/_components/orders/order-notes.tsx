@@ -7,7 +7,7 @@ export function OrderNotes({ notes, fromPdf }: { notes: string; fromPdf: boolean
   const visibleNotes = marker ? notes.slice(0, marker.index).trim() : notes;
   const importedDetails = marker ? notes.slice(marker.index).trim() : "";
   return (
-    <div className={`${ui.detailBlock} order-10`}>
+    <div className={`${ui.detailBlock} rounded-xl bg-[#f6f7f3] p-4`}>
       <span>Notas</span>
       <p className="whitespace-pre-wrap break-words">{visibleNotes || "Sin notas adicionales para este pedido."}</p>
       {importedDetails && (
