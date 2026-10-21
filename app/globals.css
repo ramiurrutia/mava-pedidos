@@ -138,6 +138,28 @@
   }
 }
 
+.manual-item-panel {
+  height: var(--collapsible-panel-height);
+  overflow: hidden;
+  opacity: 1;
+  transform: translateY(0);
+  transition: height 380ms cubic-bezier(.22, 1, .36, 1), opacity 240ms ease, transform 380ms cubic-bezier(.22, 1, .36, 1);
+}
+
+.manual-item-panel[data-starting-style],
+.manual-item-panel[data-ending-style] {
+  height: 0;
+  opacity: 0;
+  transform: translateY(-6px);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .manual-item-enter {
+    --order-step-offset: 6px;
+    animation: order-step-enter 380ms cubic-bezier(.22, 1, .36, 1) both;
+  }
+}
+
 .order-step-enter {
   animation: order-step-enter 320ms cubic-bezier(.22, 1, .36, 1) both;
 }

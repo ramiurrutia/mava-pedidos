@@ -3,6 +3,7 @@
 import { createContext, createElement, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { sileo } from "sileo";
 import { deleteOrderPdfDocument } from "../../../lib/supabase/pdf-orders-repository";
+import { mutateManualItem } from "../../../lib/supabase/manual-items-repository";
 import {
   findLatestPendingOrder,
   getOrderFolderId,
@@ -15,6 +16,7 @@ import {
   type Order,
   type OrderStatus,
   type PendingImageUpload,
+  type ManualItemDetails,
 } from "../../../lib/orders";
 import { isSupabaseConfigured } from "../../../lib/supabase/client";
 import {
@@ -309,6 +311,7 @@ function useOrdersWorkspaceState() {
     if (dataSource !== "supabase") return false;
     const targetOrder = orders.find((order) => order.id === orderId);
     const previousStatus = targetOrder?.images.find((image) => image.preparationKey === artworkKey)?.preparationStatus
+      ?? targetOrder?.manualItems?.find((item) => `manual:${item.id}` === artworkKey)?.preparationStatus
       ?? targetOrder?.items?.find((item) => item.preparationKey === artworkKey)?.preparationStatus
       ?? "Pendiente";
 
@@ -321,12 +324,14 @@ function useOrdersWorkspaceState() {
         items: order.items?.map((item) => item.preparationKey === artworkKey
           ? { ...item, preparationStatus: nextStatus }
           : item),
+        manualItems: order.manualItems?.map((item) => `manual:${item.id}` === artworkKey ? { ...item, preparationStatus: nextStatus } : item),
       }));
     }
 
     setOrders((currentOrders) => applyStatus(currentOrders, status));
     try {
-      await updateRemoteArtworkPreparation(orderId, artworkKey, status);
+      if (artworkKey.startsWith("manual:")) await mutateManualItem(orderId, artworkKey.slice(7), "status", undefined, status === "Listo");
+      else await updateRemoteArtworkPreparation(orderId, artworkKey, status);
       sileo.success({
         title: "Preparación actualizada",
         description: `El cuadro quedó marcado como ${status.toLocaleLowerCase("es")}.`,
@@ -441,6 +446,34 @@ function useOrdersWorkspaceState() {
     } finally { deletingImages.current.delete(imageId); }
   }
 
+  async function saveManualItem(orderId: string, details: ManualItemDetails, itemId?: string) {
+    if (dataSource !== "supabase") return false;
+    try {
+      const saved = await mutateManualItem(orderId, itemId ?? crypto.randomUUID(), itemId ? "update" : "create", details);
+      setOrders((current) => current.map((order) => order.id !== orderId ? order : { ...order,
+        manualItems: itemId ? order.manualItems?.map((item) => item.id === itemId ? saved : item) : [saved, ...order.manualItems ?? []],
+      }));
+      sileo.success({ title: itemId ? "Ítem actualizado" : "Ítem agregado" });
+      return true;
+    } catch (error) {
+      sileo.error({ title: "No se pudo guardar el ítem", description: error instanceof Error ? error.message : "Intentá nuevamente." });
+      return false;
+    }
+  }
+
+  async function deleteManualItem(orderId: string, itemId: string) {
+    if (dataSource !== "supabase") return false;
+    try {
+      await mutateManualItem(orderId, itemId, "delete");
+      setOrders((current) => current.map((order) => order.id !== orderId ? order : { ...order, manualItems: order.manualItems?.filter((item) => item.id !== itemId) }));
+      sileo.success({ title: "Ítem eliminado" });
+      return true;
+    } catch (error) {
+      sileo.error({ title: "No se pudo eliminar el ítem", description: error instanceof Error ? error.message : "Intentá nuevamente." });
+      return false;
+    }
+  }
+
   async function uploadImagesToFolder(clientId: string, uploads: PendingImageUpload[], requestedOrderId?: string) {
     if (dataSource !== "supabase" || !uploads.length) return false;
     const folder = folders.find((candidate) => candidate.id === clientId);
@@ -539,6 +572,8 @@ function useOrdersWorkspaceState() {
     deleteOrder,
     deleteImage,
     deletePdfDocument,
+    saveManualItem,
+    deleteManualItem,
     uploadImagesToFolder,
     createPendingOrderWithImages,
   };

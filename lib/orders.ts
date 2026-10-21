@@ -20,6 +20,13 @@ export type OrderImage = {
 
 export type ImageDetails = { title: string; description: string };
 
+export type ManualItemDetails = ImageDetails & { quantity: number };
+export type ManualOrderItem = ManualItemDetails & {
+  id: string;
+  preparationStatus: ArtworkPreparationStatus;
+  addedAt: string;
+};
+
 export type PendingImageUpload = {
   file: File;
   title?: string;
@@ -55,6 +62,7 @@ export type Order = {
   canvasesOrdered: boolean;
   createdAt: string;
   images: OrderImage[];
+  manualItems?: ManualOrderItem[];
   cover: string;
   sourceSystem?: string;
   sourceOrderId?: string;
@@ -94,9 +102,11 @@ export function getOrderArtworkProgress(order: Order) {
   ];
   const total = artworks.length;
   const ready = artworks.filter((status) => status === "Listo").length;
+  const manualTotal = (order.manualItems ?? []).reduce((sum, item) => sum + item.quantity, 0);
+  const manualReady = (order.manualItems ?? []).reduce((sum, item) => sum + (item.preparationStatus === "Listo" ? item.quantity : 0), 0);
   return {
-    ready,
-    total,
-    percentage: total ? Math.round((ready / total) * 100) : 0,
+    ready: ready + manualReady,
+    total: total + manualTotal,
+    percentage: total + manualTotal ? Math.round(((ready + manualReady) / (total + manualTotal)) * 100) : 0,
   };
 }

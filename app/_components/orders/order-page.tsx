@@ -14,6 +14,7 @@ import {
   type ImageDetails,
   type OrderStatus,
   type PendingImageUpload,
+  type ManualItemDetails,
 } from "../../../lib/orders";
 import type { OrderDetailsInput } from "../../../lib/supabase/orders-repository";
 import { ArchiveIcon, BackIcon, CheckIcon, EditIcon, ImageIcon, MoreIcon, RestoreIcon, SpinnerIcon, TrashIcon, UploadIcon } from "../icons";
@@ -25,6 +26,7 @@ import { OrderPdfAttachment } from "./order-pdf-attachment";
 import { ImportPdfPage } from "./import-pdf-page";
 import { OrderPrintButton } from "./order-print";
 import { DeleteImageDialog } from "./delete-image-dialog";
+import { ManualOrderItems } from "./manual-order-items";
 import { formatCurrency, statusStyles, ui } from "./shared";
 
 export function OrderPage({
@@ -32,6 +34,8 @@ export function OrderPage({
   onClose,
   onStatusChange,
   onAddImages,
+  onSaveManualItem,
+  onDeleteManualItem,
   onEdit,
   onEditImageDetails,
   onDeleteImage,
@@ -44,6 +48,8 @@ export function OrderPage({
   onClose: () => void;
   onStatusChange: (status: OrderStatus) => Promise<boolean>;
   onAddImages: (uploads: PendingImageUpload[]) => Promise<boolean>;
+  onSaveManualItem: (details: ManualItemDetails, itemId?: string) => Promise<boolean>;
+  onDeleteManualItem: (itemId: string) => Promise<boolean>;
   onEdit: (input: OrderDetailsInput) => Promise<boolean>;
   onEditImageDetails: (imageId: string, details: ImageDetails) => Promise<ImageDetails | null>;
   onDeleteImage: (imageId: string) => Promise<boolean>;
@@ -281,6 +287,7 @@ export function OrderPage({
               <span className="block h-full rounded-full bg-[#3f765f] transition-[width] duration-300" style={{ width: `${artworkProgress.percentage}%` }} />
             </div>
           </div>
+          <ManualOrderItems items={order.manualItems ?? []} canAdd={canAddImages} onSave={onSaveManualItem} onDelete={onDeleteManualItem} onStatusChange={onArtworkPreparationChange} />
           <input ref={fileInput} type="file" accept="image/*" multiple hidden disabled={uploading || !canAddImages} onChange={(event) => { selectImages(Array.from(event.target.files ?? [])); event.target.value = ""; }} />
           <ImagePasteArea className="order-6" disabled={uploading || !canAddImages} onImages={selectImages}>
           {!pendingUploads.length ? (

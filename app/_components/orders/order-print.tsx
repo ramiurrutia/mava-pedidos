@@ -117,6 +117,12 @@ function OrderPrintContent({ order }: { order: Order }) {
         </section>
       )}
       {order.sourceSystem !== "PDF" && order.total !== undefined && <p className="order-print-total"><strong>Total: {formatCurrency(order.total)}</strong></p>}
+      {!!order.manualItems?.length && <section>
+        <h2>Ítems sin imagen</h2>
+        {order.manualItems.map((item) => <div className="order-print-artwork" key={item.id}>
+          <div><strong>{item.title} · Cantidad: {item.quantity}</strong><p className="order-print-notes">{item.description}</p></div>
+        </div>)}
+      </section>}
       {!!order.images.length && (
         <section>
           <h2>Imágenes agregadas · {order.images.length} archivos</h2>

@@ -603,6 +603,7 @@ function getOrderSearchIndex(order: Order) {
     formatArtworkProgress(order),
     ...imageDetails,
     ...itemDetails,
+    ...(order.manualItems ?? []).flatMap((item) => [item.title, item.description, item.quantity, item.preparationStatus]),
   ].filter((value) => value !== undefined && value !== null).join(" ");
 }
 
@@ -623,6 +624,9 @@ function describeOrderMatch(order: Order, query: string) {
       ["Título", image.title],
       ["Descripción", image.description],
       ["Preparación", image.preparationStatus],
+    ]),
+    ...(order.manualItems ?? []).flatMap((item): Array<[string, string | undefined]> => [
+      ["Ítem", item.title], ["Descripción", item.description], ["Preparación", item.preparationStatus],
     ]),
     ...(order.items ?? []).flatMap((item): Array<[string, string | undefined]> => [
       ["Cuadro", `${item.code} ${item.name}`],

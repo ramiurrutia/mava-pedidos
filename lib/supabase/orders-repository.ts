@@ -10,6 +10,7 @@ import {
 } from "../orders";
 import { createClient } from "./client";
 import { getImageTitle } from "../image-title";
+import { loadManualItems } from "./manual-items-repository";
 
 const IMAGE_BUCKET = "order-images";
 
@@ -135,7 +136,7 @@ function createSignedImage(image: ImageRow | PreparedImageRow, previewUrl?: stri
 
 export async function loadWorkspace(): Promise<{ folders: ClientFolder[]; orders: Order[] }> {
   const supabase = createClient();
-  const [foldersResult, ordersResult] = await Promise.all([
+  const [foldersResult, ordersResult, manualItems] = await Promise.all([
     supabase.from("client_folders").select("id, name").order("name"),
     supabase
       .from("orders")
@@ -174,6 +175,7 @@ export async function loadWorkspace(): Promise<{ folders: ClientFolder[]; orders
       `)
       .is("deleted_at", null)
       .order("created_at", { ascending: false }),
+    loadManualItems(),
   ]);
 
   if (foldersResult.error) throw foldersResult.error;
@@ -220,6 +222,7 @@ export async function loadWorkspace(): Promise<{ folders: ClientFolder[]; orders
         ...createSignedImage(imageRow, signedUrlByPath.get(imageRow.storage_key)),
         preparationStatus: preparationByKey.get(`image:${imageRow.id}`) ?? "Pendiente",
       })),
+      manualItems: manualItems.get(row.id) ?? [],
       cover: covers[index % covers.length],
       sourceSystem: row.source_system ?? undefined,
       sourceOrderId: row.source_order_id ?? undefined,

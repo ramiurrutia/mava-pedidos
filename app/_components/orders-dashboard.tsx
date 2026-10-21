@@ -95,6 +95,8 @@ export function OrdersDashboard({
       ) : view === "pedido" && routeOrder ? (
         <OrderPage
           onAddImages={(uploads) => workspace.uploadImagesToFolder(routeOrder.clientId, uploads, routeOrder.id)}
+          onSaveManualItem={(details, itemId) => workspace.saveManualItem(routeOrder.id, details, itemId)}
+          onDeleteManualItem={(itemId) => workspace.deleteManualItem(routeOrder.id, itemId)}
           onClose={() => router.replace(routeOrder.status === "Archivado" ? "/pedidos/archivados" : "/pedidos")}
           onDelete={async () => {
             const deleted = await workspace.deleteOrder(routeOrder.id);
