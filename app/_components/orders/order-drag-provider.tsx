@@ -131,7 +131,7 @@ function OrderDragPreview({ order, saving }: { order: Order; saving: boolean }) 
     <div className="w-[min(300px,calc(100vw_-_32px))] rounded-xl border border-[#91b4a1] bg-white p-3 shadow-[0_16px_45px_rgb(20_45_30/22%)] ring-4 ring-[#235c4c]/10" aria-hidden="true">
       <div className="flex items-center gap-3">
         <span className="grid size-10 shrink-0 place-items-center rounded-lg text-white" style={{ background: order.cover }}><ImageIcon /></span>
-        <span className="min-w-0"><strong className="block truncate text-sm font-semibold">{order.clientName}</strong><small className="mt-1 block text-[11px] text-[#68726d]">{order.code}</small></span>
+        <span className="min-w-0"><strong className="block truncate text-sm font-semibold">{order.clientName}</strong><small className="mt-1 block text-[14px] text-[#68726d]">{order.code}</small></span>
       </div>
       <p className="mt-3 flex items-center gap-2 border-t border-[#e5ece6] pt-2 text-xs text-[#235c4c]">{saving ? <SpinnerIcon className="size-3.5 animate-spin" /> : <FolderIcon className="size-3.5" />}<span className="truncate">{saving ? "Moviendo pedido…" : destination ? `Soltar en ${destination.toLocaleUpperCase("es")}` : "Arrastrá a una carpeta"}</span></p>
     </div>

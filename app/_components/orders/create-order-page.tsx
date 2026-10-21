@@ -202,7 +202,7 @@ function FirstStep({
       </label>
       <fieldset className="mb-4 rounded-xl border border-[#dfe3df] bg-[#fafbf9] p-4">
         <legend className="px-1 text-xs font-semibold text-[#34413c]">¿Ya se pidieron las telas?</legend>
-        <p className="mb-3 mt-1 text-[10px] leading-relaxed text-[#75807b]">Podrás cambiar esta respuesta después desde el pedido.</p>
+        <p className="mb-3 mt-1 text-[14px] leading-relaxed text-[#75807b]">Podrás cambiar esta respuesta después desde el pedido.</p>
         <div className="grid grid-cols-2 gap-2">
           <button
             aria-pressed={!canvasesOrdered}
@@ -331,13 +331,13 @@ function ClientFolderInput({
                 type="button"
               >
                 <span className="truncate">{folder.name.toLocaleUpperCase("es")}</span>
-                <small className="ml-3 shrink-0 text-[9px] font-normal text-[#89928e]">Carpeta existente</small>
+                <small className="ml-3 shrink-0 text-[14px] font-normal text-[#89928e]">Carpeta existente</small>
               </button>
             ))}
           </div>
         )}
       </div>
-      <small className={`${exactFolder ? "text-[#3f765f]" : "text-[#7b8580]"} text-[10px] leading-relaxed`}>
+      <small className={`${exactFolder ? "text-[#3f765f]" : "text-[#7b8580]"} text-[14px] leading-relaxed`}>
         {exactFolder ? `Se usará la carpeta existente “${exactFolder.name.toLocaleUpperCase("es")}”.` : "Si el cliente todavía no existe, su carpeta se creará junto con el pedido."}
       </small>
     </>

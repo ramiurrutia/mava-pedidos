@@ -47,9 +47,9 @@ export function ImageDescriptionEditor({
       <div className="flex items-center justify-between gap-3">
         <div>
           <strong className="block text-xs font-semibold">Título y descripción de la imagen</strong>
-          <span className="mt-1 block text-[10px] text-[#75807b]">Imagen {currentIndex + 1} de {uploads.length}</span>
+          <span className="mt-1 block text-[14px] text-[#75807b]">Imagen {currentIndex + 1} de {uploads.length}</span>
         </div>
-        <span className="rounded-full bg-[#edf3ef] px-2.5 py-1.5 text-[9px] font-semibold text-[#235c4c]">
+        <span className="rounded-full bg-[#edf3ef] px-2.5 py-1.5 text-[14px] font-semibold text-[#235c4c]">
           {uploads.filter((upload) => upload.description.trim()).length}/{uploads.length} con nota
         </span>
       </div>
@@ -72,7 +72,7 @@ export function ImageDescriptionEditor({
           placeholder={getImageTitle(undefined, current.description) || current.file.name}
           value={current.title ?? ""}
         />
-        <small className="text-[10px] text-[#8b9490]">Si lo dejás vacío, se usará la medida detectada en la descripción o el nombre del archivo.</small>
+        <small className="text-[14px] text-[#8b9490]">Si lo dejás vacío, se usará la medida detectada en la descripción o el nombre del archivo.</small>
       </label>
       <label className={`${ui.field} mb-0`}>
         <span>Descripción de la imagen</span>
@@ -84,7 +84,7 @@ export function ImageDescriptionEditor({
           rows={4}
           value={current.description}
         />
-        <small className="text-right text-[9px] text-[#8b9490]">{current.description.length}/1000</small>
+        <small className="text-right text-[14px] text-[#8b9490]">{current.description.length}/1000</small>
       </label>
 
       {uploads.length > 1 && (

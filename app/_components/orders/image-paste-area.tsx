@@ -61,7 +61,7 @@ export function ImagePasteArea({ children, onImages, disabled = false, className
           <button className={ui.secondaryButton} disabled={reading} onClick={() => void pasteImage()} type="button">
             {reading ? <SpinnerIcon className="animate-spin" /> : <ClipboardIcon />}{reading ? "Leyendo imagen..." : "Pegar imagen"}
           </button>
-          <p className="text-[11px] leading-relaxed text-[#68726d]">También podés hacer clic derecho en esta zona o pegar con Ctrl+V.</p>
+          <p className="text-[14px] leading-relaxed text-[#68726d]">También podés hacer clic derecho en esta zona o pegar con Ctrl+V.</p>
           <p className="text-xs leading-relaxed text-[#68726d]" role="status" aria-live="polite">{message}</p>
         </div>}
       </ContextMenu.Trigger>

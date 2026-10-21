@@ -211,7 +211,7 @@ export function OrderPage({
             <p className={ui.eyebrow}>{order.code}</p>
             <div className="flex flex-wrap items-center gap-2.5">
               <h2 id="order-title">{order.clientName}</h2>
-              {order.sourceSystem && <span className="rounded-full bg-[#e8f0eb] px-2.5 py-1 text-[9px] font-bold tracking-[.06em] text-[#235c4c]">{order.sourceSystem}</span>}
+              {order.sourceSystem && <span className="rounded-full bg-[#e8f0eb] px-2.5 py-1 text-[14px] font-bold tracking-[.06em] text-[#235c4c]">{order.sourceSystem}</span>}
             </div>
           </div>
           <div className="relative">
@@ -236,7 +236,7 @@ export function OrderPage({
         {confirmingDelete && (
           <div className="mb-5 rounded-lg border border-[#ead7d3] bg-[#fff7f5] p-4">
             <strong className="block text-xs font-semibold text-[#873f36]">¿Eliminar {order.code}?</strong>
-            <p className="mt-1 text-[10px] leading-relaxed text-[#876760]">Dejará de aparecer en la aplicación, pero sus datos e imágenes podrán recuperarse desde Supabase.</p>
+            <p className="mt-1 text-[14px] leading-relaxed text-[#876760]">Dejará de aparecer en la aplicación, pero sus datos e imágenes podrán recuperarse desde Supabase.</p>
             <div className="mt-3 flex justify-end gap-2">
               <button className={ui.secondaryButton} disabled={deleting} onClick={() => setConfirmingDelete(false)} type="button">Cancelar</button>
               <button className="inline-flex min-h-10 cursor-pointer items-center justify-center gap-2 rounded-lg bg-[#a34e42] px-4 text-xs font-semibold text-white hover:bg-[#873f36] disabled:cursor-not-allowed disabled:opacity-50" disabled={deleting} onClick={() => void deleteOrder()} type="button">
@@ -264,7 +264,7 @@ export function OrderPage({
             <span className={`${order.canvasesOrdered ? "border-[#3f7c61] bg-[#3f7c61] text-white" : "border-[#b9b2aa] bg-white text-transparent"} grid size-6 shrink-0 place-items-center rounded-md border-2 transition-colors [&_svg]:size-4`}>{savingCanvasesOrdered ? <SpinnerIcon className="animate-spin text-[#3f7c61]" /> : <CheckIcon />}</span>
             <span className="min-w-0">
               <strong className="block text-xs font-semibold text-[#29352f]">Telas pedidas</strong>
-              <small className="mt-1 block text-[11px] leading-relaxed text-[#68736d]">
+              <small className="mt-1 block text-[14px] leading-relaxed text-[#68736d]">
                 {order.canvasesOrdered ? "Las telas de este pedido ya fueron solicitadas." : "Todavía falta pedir las telas necesarias para preparar los cuadros."}
               </small>
             </span>
@@ -272,7 +272,7 @@ export function OrderPage({
           <div className="order-3 rounded-xl border border-[#dfe5e1] bg-[#f8faf8] p-4">
             <div className="flex items-end justify-between gap-4">
               <span>
-                <small className="block text-[11px] font-semibold text-[#68736d]">Preparación de cuadros</small>
+                <small className="block text-[14px] font-semibold text-[#68736d]">Preparación de cuadros</small>
                 <strong className="mt-1 block text-base font-semibold">{artworkProgress.total ? `${artworkProgress.ready} de ${artworkProgress.total} listos` : "Sin cuadros todavía"}</strong>
               </span>
               {artworkProgress.total > 0 && <strong className="text-sm font-semibold text-[#3f765f]">{artworkProgress.percentage}%</strong>}
@@ -334,10 +334,10 @@ export function OrderPage({
                     )}
                     <span className="min-w-0">
                       <strong className="block truncate text-xs font-semibold">{item.code}</strong>
-                      <small className="mt-1 block text-[11px] leading-relaxed text-[#68736d]">{item.name} · {item.size}{item.backgroundLabel ? ` · ${item.backgroundLabel}` : ""}</small>
+                      <small className="mt-1 block text-[14px] leading-relaxed text-[#68736d]">{item.name} · {item.size}{item.backgroundLabel ? ` · ${item.backgroundLabel}` : ""}</small>
                       <button
                         aria-label={item.preparationStatus === "Listo" ? `Marcar ${item.code} como pendiente` : `Marcar ${item.code} como listo`}
-                        className={`${preparationStyle(item.preparationStatus ?? "Pendiente")} mt-2 inline-flex min-h-8 items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-semibold`}
+                        className={`${preparationStyle(item.preparationStatus ?? "Pendiente")} mt-2 inline-flex min-h-8 items-center gap-1.5 rounded-full px-2.5 py-1 text-[14px] font-semibold`}
                         disabled={updatingArtworkKeys.has(item.preparationKey ?? `stock:${item.id}:${index}`)}
                         onClick={() => void changeArtworkPreparation(item.preparationKey ?? `stock:${item.id}:${index}`, item.preparationStatus === "Listo" ? "Pendiente" : "Listo")}
                         type="button"
@@ -378,7 +378,7 @@ export function OrderPage({
                       <h3 className="text-sm font-semibold text-[#29352f] [overflow-wrap:anywhere]">{image.title || `Imagen ${index + 1}`}</h3>
                       <p className="mt-1 text-xs leading-relaxed text-[#68736d] [overflow-wrap:anywhere]"><span className="font-medium">Archivo: </span>{image.name}</p>
                       {image.description && <p className="mt-2 whitespace-pre-wrap text-xs leading-relaxed text-[#48564e] [overflow-wrap:anywhere]">{image.description}</p>}
-                      <time className="mt-2 block text-[10px] text-[#7b8580]" dateTime={image.addedAt}>{new Intl.DateTimeFormat("es-AR", { dateStyle: "short", timeStyle: "short" }).format(new Date(image.addedAt))}</time>
+                      <time className="mt-2 block text-[14px] text-[#7b8580]" dateTime={image.addedAt}>{new Intl.DateTimeFormat("es-AR", { dateStyle: "short", timeStyle: "short" }).format(new Date(image.addedAt))}</time>
                     </div>
                   </div>
                   <div className="mt-3 flex flex-wrap items-center gap-2">

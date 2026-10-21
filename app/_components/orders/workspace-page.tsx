@@ -166,11 +166,16 @@ export function WorkspacePage({
         <RecentNotifications compact dataSource={dataSource} orders={recentOrders} />
       )}
 
-      {view !== "resumen" && <section aria-labelledby="orders-title">
+      {view !== "resumen" && <section
+        aria-labelledby="orders-title"
+        className={view === "pedidos" ? "order-folder-enter" : undefined}
+        data-folder={view === "pedidos" ? activeStatus : undefined}
+        key={view === "pedidos" ? activeStatus : view}
+      >
         <div className={`${ui.sectionHeading} ${ui.ordersHeading}`}>
           <div>
             <h2 className={ui.h2} id="orders-title">{view === "pedidos" ? statusFolderNames[activeStatus] : "Carpetas"}</h2>
-            <p className="mt-1 text-[11px] text-[#7b8580]">
+            <p className="mt-1 text-[14px] text-[#7b8580]">
               {view === "pedidos" ? `${filteredOrders.length} ${filteredOrders.length === 1 ? "pedido encontrado" : "pedidos encontrados"}` : "Pedidos agrupados por carpeta y origen"}
             </p>
           </div>
@@ -217,7 +222,7 @@ function GlobalSearch({
         <SearchIcon />
         <span className="sr-only">Buscar en toda la aplicación</span>
         <input
-          className="min-w-0 flex-1 border-0 bg-transparent text-[13px] text-[#202825] outline-none placeholder:text-[#8d9792]"
+          className="min-w-0 flex-1 border-0 bg-transparent text-[15px] text-[#202825] outline-none placeholder:text-[#8d9792]"
           onChange={(event) => onQueryChange(event.target.value)}
           placeholder="Buscar pedidos, clientes, notas, cuadros..."
           type="text"
@@ -257,7 +262,7 @@ function GlobalSearchResults({
       <div className="mb-3 flex items-end justify-between gap-4">
         <div>
           <h2 className="text-base font-semibold tracking-[-.02em]">Resultados</h2>
-          <p className="mt-0.5 text-[11px] text-[#7b8580]">
+          <p className="mt-0.5 text-[14px] text-[#7b8580]">
             {dataSource === "loading" ? "Buscando en el taller..." : `${totalResults} coincidencia${totalResults === 1 ? "" : "s"}`}
           </p>
         </div>
@@ -271,7 +276,7 @@ function GlobalSearchResults({
         <div className="grid gap-4">
           {folders.length > 0 && (
             <div>
-              <h3 className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-[#87918c]">Carpetas</h3>
+              <h3 className="mb-2 text-[14px] font-semibold uppercase tracking-widest text-[#87918c]">Carpetas</h3>
               <div className="grid grid-cols-2 gap-2 max-[520px]:grid-cols-1">
                 {folders.slice(0, 4).map((folder) => (
                   <Link
@@ -280,7 +285,7 @@ function GlobalSearchResults({
                     key={folder.id}
                   >
                     <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-[#e7efe9] text-[#235c4c] [&_svg]:size-4"><FolderIcon /></span>
-                    <span className="min-w-0 flex-1"><strong className="block truncate text-xs font-semibold">{folder.name.toLocaleUpperCase("es")}</strong><small className="mt-1 block text-[10px] text-[#7b8580]">Abrir carpeta</small></span>
+                    <span className="min-w-0 flex-1"><strong className="block truncate text-xs font-semibold">{folder.name.toLocaleUpperCase("es")}</strong><small className="mt-1 block text-[14px] text-[#7b8580]">Abrir carpeta</small></span>
                     <span className="text-[#a4aca8] [&_svg]:size-3"><ArrowIcon /></span>
                   </Link>
                 ))}
@@ -290,7 +295,7 @@ function GlobalSearchResults({
 
           {visibleOrders.length > 0 && (
             <div>
-              <h3 className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-[#87918c]">Pedidos</h3>
+              <h3 className="mb-2 text-[14px] font-semibold uppercase tracking-widest text-[#87918c]">Pedidos</h3>
               <div className="divide-y divide-[#e7e9e6] overflow-hidden rounded-xl border border-[#e2e6e2] bg-white">
                 {visibleOrders.map((order) => (
                   <Link
@@ -301,14 +306,14 @@ function GlobalSearchResults({
                     <span className={ui.orderCover} style={{ background: order.cover }}><ImageIcon /></span>
                     <span className="min-w-0">
                       <strong className="block truncate text-xs font-semibold">{order.code} · {order.clientName}</strong>
-                      <small className="mt-1 block truncate text-[10px] text-[#6f7a74]">{describeOrderMatch(order, query)}</small>
+                      <small className="mt-1 block truncate text-[14px] text-[#6f7a74]">{describeOrderMatch(order, query)}</small>
                     </span>
                     <span className={`${ui.statusPill} ${statusStyles[order.status]} max-[520px]:hidden`}><i />{order.status}</span>
                     <span className="text-[#a4aca8] [&_svg]:size-3"><ArrowIcon /></span>
                   </Link>
                 ))}
               </div>
-              {orders.length > visibleOrders.length && <p className="mt-2 text-center text-[10px] text-[#7b8580]">Mostrando los primeros {visibleOrders.length} pedidos.</p>}
+              {orders.length > visibleOrders.length && <p className="mt-2 text-center text-[14px] text-[#7b8580]">Mostrando los primeros {visibleOrders.length} pedidos.</p>}
             </div>
           )}
         </div>
@@ -316,7 +321,7 @@ function GlobalSearchResults({
         <div className="flex min-h-40 flex-col items-center justify-center gap-2 rounded-xl border border-[#e2e6e2] bg-white px-5 text-center">
           <SearchIcon />
           <strong className="text-xs font-semibold">No encontramos “{query.trim()}”</strong>
-          <span className="max-w-sm text-[11px] leading-relaxed text-[#78827d]">Probá con un código, cliente, teléfono, estado, nota, descripción, tamaño o nombre de cuadro.</span>
+          <span className="max-w-sm text-[14px] leading-relaxed text-[#78827d]">Probá con un código, cliente, teléfono, estado, nota, descripción, tamaño o nombre de cuadro.</span>
         </div>
       )}
     </section>
@@ -341,7 +346,7 @@ function StatusFolders({
       <div className="mb-2.5 flex items-center justify-between gap-4">
         <div>
           <h2 className="text-base font-semibold tracking-[-.02em]" id="home-status-folders-title">Carpetas de pedidos</h2>
-          <p className="mt-0.5 text-[11px] text-[#7b8580]">Subidos y archivados, por separado</p>
+          <p className="mt-0.5 text-[14px] text-[#7b8580]">Subidos y archivados, por separado</p>
         </div>
       </div>
 
@@ -359,7 +364,7 @@ function StatusFolders({
             <span className={`${statusStyles[status]} grid size-9 shrink-0 place-items-center rounded-lg [&_svg]:size-4`}>{status === "Archivado" ? <ArchiveIcon /> : <FolderIcon />}</span>
             <span className="min-w-0 flex-1">
               <strong className="block text-xs font-semibold leading-tight">{statusFolderNames[status]}</strong>
-              <small className="mt-1 block truncate text-[11px] text-[#7b8580]">{counts[status]} pedido{counts[status] === 1 ? "" : "s"}</small>
+              <small className="mt-1 block truncate text-[14px] text-[#7b8580]">{counts[status]} pedido{counts[status] === 1 ? "" : "s"}</small>
             </span>
             <span className="shrink-0 text-[#a4aca8] [&_svg]:size-3"><ArrowIcon /></span>
           </Link>
@@ -422,7 +427,7 @@ function RecentNotifications({
       <div className={`${compact ? "mb-2.5" : "mb-4"} flex items-end justify-between gap-4`}>
         <div>
           <h2 className={ui.h2} id="recent-notifications-title">Notificaciones recientes</h2>
-          <p className="mt-1 text-[11px] text-[#7b8580]">Últimos pedidos recibidos</p>
+          <p className="mt-1 text-[14px] text-[#7b8580]">Últimos pedidos recibidos</p>
         </div>
         {seenStateReady && visibleOrders.length > 0 && (
           <button className={ui.textButton} onClick={markAllAsSeen} type="button">Marcar todos como vistos</button>
@@ -452,7 +457,7 @@ function RecentNotifications({
             </span>
             <span className="min-w-0">
               <strong className="block truncate text-xs font-semibold">Nuevo pedido de {order.clientName}</strong>
-              <small className="mt-1 block truncate text-[10px] text-[#7b8580]">
+              <small className="mt-1 block truncate text-[14px] text-[#7b8580]">
                 {order.code}{order.sourceSystem ? ` · ${order.sourceSystem}` : ""} · {formatRecentDate(order.createdAt)}
               </small>
             </span>
@@ -460,7 +465,7 @@ function RecentNotifications({
             <span className="text-[#a4aca8] [&_svg]:size-3.5"><ArrowIcon /></span>
           </Link>
         )) : (
-          <div className="flex min-h-24 flex-col items-center justify-center gap-2 px-5 text-center text-[11px] text-[#78827d]">
+          <div className="flex min-h-24 flex-col items-center justify-center gap-2 px-5 text-center text-[14px] text-[#78827d]">
             <BellIcon />
             <strong className="text-xs font-semibold text-[#202825]">Todavía no hay notificaciones</strong>
             <span>Los pedidos nuevos aparecerán acá.</span>
@@ -529,7 +534,7 @@ function LoadingWorkspace() {
 function OrdersList({ orders }: { orders: Order[] }) {
   return (
     <>
-      <div className={`${orderListGrid} hidden min-h-10 border-b border-[#e5e7e3] bg-[#fafbf9] px-4 text-[10px] font-medium uppercase tracking-wide text-[#7b8580] @min-[680px]:grid`}><span>Cliente / pedido</span><span>Estado</span><span>Creado</span><span className="sr-only">Acciones</span></div>
+      <div className={`${orderListGrid} hidden min-h-10 border-b border-[#e5e7e3] bg-[#fafbf9] px-4 text-[14px] font-medium uppercase tracking-wide text-[#7b8580] @min-[680px]:grid`}><span>Cliente / pedido</span><span>Estado</span><span>Creado</span><span className="sr-only">Acciones</span></div>
       {orders.map((order) => <OrderListRow order={order} key={order.id} />)}
       {!orders.length && <div className={ui.emptyState}><SearchIcon /><strong>No encontramos pedidos</strong><span>Probá con otro código, carpeta o estado.</span></div>}
     </>

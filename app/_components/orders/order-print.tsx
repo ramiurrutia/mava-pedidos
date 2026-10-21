@@ -73,7 +73,7 @@ export function OrderPrintButton({ order }: { order: Order }) {
         {preparing ? <SpinnerIcon className="animate-spin" /> : <PrinterIcon />}
         {preparing ? "Preparando..." : "Imprimir / PDF"}
       </button>
-      <p className="text-[11px] text-[#68736d]">Elegí “Guardar como PDF” en la impresión.</p>
+      <p className="text-[14px] text-[#68736d]">Elegí “Guardar como PDF” en la impresión.</p>
       {error && <p className="max-w-72 text-xs text-[#a34e42]" role="alert">{error}</p>}
       {mounted && createPortal(
         <article className="order-print" ref={documentRef} aria-label={`Pedido ${order.code} para imprimir`}>

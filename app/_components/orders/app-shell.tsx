@@ -43,6 +43,7 @@ export function AppShell({
 }) {
   const isHome = activeView === "resumen";
   const pathname = usePathname();
+  const isOrderList = pathname === "/pedidos" || pathname === "/pedidos/archivados";
   const rememberedRoutes = useSyncExternalStore(
     subscribeToNavigationMemory,
     getNavigationSnapshot,
@@ -84,7 +85,7 @@ export function AppShell({
         ))}
       </nav>
 
-      <main className={`${ui.main} ${isHome ? "h-[calc(100dvh-68px)] overflow-hidden pb-[calc(72px+env(safe-area-inset-bottom))] pt-4 max-[600px]:pt-4 [@media(max-height:650px)]:h-auto [@media(max-height:650px)]:overflow-visible" : ""}`}>{children}</main>
+      <main className={`${ui.main} ${isOrderList ? "" : "motion-safe:animate-[page-enter_220ms_ease-out_both]"} ${isHome ? "h-[calc(100dvh-68px)] overflow-hidden pb-[calc(72px+env(safe-area-inset-bottom))] pt-4 max-[600px]:pt-4 [@media(max-height:650px)]:h-auto [@media(max-height:650px)]:overflow-visible" : ""}`}>{children}</main>
     </div>
   );
 }

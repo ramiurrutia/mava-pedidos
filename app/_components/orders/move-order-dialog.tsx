@@ -64,7 +64,7 @@ export function MoveOrderDialog({ order, onClose }: { order: Order; onClose: () 
             else setError("No se pudo mover. El pedido sigue en su carpeta original. Intentá nuevamente.");
           }}>
             <div className="min-h-0 overflow-y-auto overscroll-contain px-5 py-4">
-              <p className="break-all text-[11px] text-[#7b8580]">{order.code}</p>
+              <p className="break-all text-[14px] text-[#7b8580]">{order.code}</p>
               <p className="mb-4 mt-1 text-xs text-[#68726d]">Carpeta actual: <strong className="font-medium text-[#35433b]">{currentName.toLocaleUpperCase("es")}</strong></p>
               <label className="mb-3 flex min-h-11 items-center gap-2 rounded-xl border border-[#dfe5df] px-3 text-[#68726d] focus-within:border-[#82a092] focus-within:ring-2 focus-within:ring-[#e4eee8]">
                 <SearchIcon />
@@ -92,7 +92,7 @@ export function MoveOrderDialog({ order, onClose }: { order: Order; onClose: () 
             </div>
             <div className="shrink-0 border-t border-[#e7ebe7] bg-[#fafbf9] px-5 py-4">
               <p aria-live="polite" className="mb-1 text-xs leading-relaxed text-[#35433b]">{selectedFolder ? <>Destino: <strong>{selectedFolder.name.toLocaleUpperCase("es")}</strong></> : "Seleccioná una carpeta para continuar."}</p>
-              <p className="mb-4 text-[11px] leading-relaxed text-[#68726d]">El cliente, las imágenes y el origen del pedido no cambian.</p>
+              <p className="mb-4 text-[14px] leading-relaxed text-[#68726d]">El cliente, las imágenes y el origen del pedido no cambian.</p>
               {error && <p role="alert" className="mb-3 text-xs text-[#a44236]">{error}</p>}
               <div className="flex gap-2 sm:justify-end">
                 <Dialog.Close className={`${ui.secondaryButton} flex-1 sm:flex-none`} disabled={saving}>Cancelar</Dialog.Close>

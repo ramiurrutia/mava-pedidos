@@ -131,14 +131,14 @@ export function OrderEditModal({
         <aside className="hidden flex-col justify-between overflow-hidden bg-[#173d34] p-7 text-white min-[720px]:flex">
           <div>
             <span className="grid size-11 place-items-center rounded-xl bg-white/12 text-white [&_svg]:size-[18px]"><EditIcon /></span>
-            <p className="mt-7 text-[10px] font-semibold uppercase tracking-[.14em] text-white/55">Gestión del pedido</p>
-            <h2 className="mt-2 text-[27px] font-semibold leading-tight tracking-[-.035em]">Editar información</h2>
+            <p className="mt-7 text-[14px] font-semibold uppercase tracking-[.14em] text-white/55">Gestión del pedido</p>
+            <h2 className="mt-2 text-[29px] font-semibold leading-tight tracking-[-.035em]">Editar información</h2>
             <p className="mt-3 text-xs leading-relaxed text-white/68">Actualizá los datos del cliente y las indicaciones sin alterar los cuadros ni su preparación.</p>
           </div>
           <div className="rounded-xl border border-white/10 bg-white/[.07] p-4">
-            <span className="block text-[9px] font-semibold uppercase tracking-[.12em] text-white/50">Pedido</span>
+            <span className="block text-[14px] font-semibold uppercase tracking-[.12em] text-white/50">Pedido</span>
             <strong className="mt-1.5 block truncate text-xs font-semibold">{order.code}</strong>
-            <span className="mt-2 block truncate text-[11px] text-white/65">{order.clientName}</span>
+            <span className="mt-2 block truncate text-[14px] text-white/65">{order.clientName}</span>
           </div>
         </aside>
 
@@ -149,7 +149,7 @@ export function OrderEditModal({
               <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-[#e8f1eb] text-[#235c4c] min-[720px]:hidden [&_svg]:size-[17px]"><EditIcon /></span>
               <div className="min-w-0">
                 <h2 className="text-xl font-semibold tracking-[-.025em] min-[720px]:text-lg" id="edit-order-modal-title">Datos del pedido</h2>
-                <p className="mt-1 truncate text-[11px] font-medium text-[#77817c]">{order.code}<span className="min-[720px]:hidden"> · Cambiá la información general</span></p>
+                <p className="mt-1 truncate text-[14px] font-medium text-[#77817c]">{order.code}<span className="min-[720px]:hidden"> · Cambiá la información general</span></p>
               </div>
             </div>
             <button
@@ -165,7 +165,7 @@ export function OrderEditModal({
 
           <form className="flex min-h-0 flex-1 flex-col" onSubmit={saveDetails}>
             <div className="modal-scroll-area min-h-0 flex-1 touch-pan-y overflow-y-auto overscroll-contain px-5 py-5 min-[560px]:px-7 min-[560px]:py-6">
-              <p className="mb-5 rounded-xl bg-[#f4f7f4] px-3.5 py-3 text-[11px] leading-relaxed text-[#65706a] min-[720px]:hidden">Solo se actualizarán estos datos. El código, las imágenes y el avance de preparación se mantienen igual.</p>
+              <p className="mb-5 rounded-xl bg-[#f4f7f4] px-3.5 py-3 text-[14px] leading-relaxed text-[#65706a] min-[720px]:hidden">Solo se actualizarán estos datos. El código, las imágenes y el avance de preparación se mantienen igual.</p>
               <label className={ui.field}>
                 <span>Cliente / carpeta</span>
                 <input autoComplete="organization" autoFocus maxLength={80} onChange={(event) => setClientName(event.target.value)} required value={clientName} />
@@ -267,7 +267,7 @@ function MobileOrderEditSheet({
                 <div className="flex items-center justify-between gap-4">
                   <div className="min-w-0">
                     <Drawer.Title className="text-xl font-semibold tracking-[-.025em]">Editar pedido</Drawer.Title>
-                    <Drawer.Description className="mt-1 truncate text-[11px] font-medium text-[#77817c]">{order.code} · Deslizá hacia arriba para ampliar</Drawer.Description>
+                    <Drawer.Description className="mt-1 truncate text-[14px] font-medium text-[#77817c]">{order.code} · Deslizá hacia arriba para ampliar</Drawer.Description>
                   </div>
                   <button
                     aria-label="Cerrar edición"

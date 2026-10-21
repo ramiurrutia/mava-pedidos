@@ -38,7 +38,7 @@ export function SelectedImageThumbnails({ uploads, onRemove }: { uploads: Pendin
             onClick={() => onRemove(index)}
             type="button"
           ><TrashIcon /></button>}
-          <span className="absolute bottom-1 right-1 grid size-4 place-items-center rounded-full bg-[#1d2b26]/80 text-[8px] font-semibold text-white">{index + 1}</span>
+          <span className="absolute bottom-1 right-1 grid size-4 place-items-center rounded-full bg-[#1d2b26]/80 text-[14px] font-semibold text-white">{index + 1}</span>
         </div>
       ))}
     </div>

@@ -19,7 +19,7 @@ export function PdfPagePreview({ pages }: { pages: PdfOrderPreview["pages"] }) {
         <button type="button" className={ui.secondaryButton} disabled={page === pages.length - 1} aria-label="Página siguiente" onClick={() => setPage((value) => value + 1)}><ArrowIcon /></button>
       </div>
       <button type="button" aria-label={`Ampliar página ${page + 1} del PDF`} onClick={() => setOpen(true)} className="block aspect-[0.707] max-h-[65dvh] w-full cursor-zoom-in rounded-lg bg-white bg-contain bg-center bg-no-repeat shadow-sm focus-visible:outline-2 focus-visible:outline-[#235c4c]" style={{ backgroundImage: `url("${pages[page]?.previewUrl}")` }} />
-      <p className="mt-2 text-center text-[11px] text-[#68726d]">Tocá la página para ampliarla</p>
+      <p className="mt-2 text-center text-[14px] text-[#68726d]">Tocá la página para ampliarla</p>
       <Lightbox open={open} close={() => setOpen(false)} index={page} on={{ view: ({ index }) => setPage(index) }} slides={pages.map((item) => ({ src: item.previewUrl, alt: `Página ${item.number}` }))} plugins={[Zoom]} carousel={{ finite: true }} />
     </div>
   );
@@ -31,7 +31,7 @@ export function PdfProductEditor({ product, disabled, onChange, showPrices = fal
     <div className="rounded-xl border border-[#e0e6e0] bg-white p-3 sm:p-4">
       <div className="mb-3 flex items-start gap-3">
         <button type="button" aria-label={`Ampliar ${product.code}`} onClick={() => setOpen(true)} className="size-20 shrink-0 cursor-zoom-in rounded-lg border border-[#e0e6e0] bg-[#f8f9f6] bg-contain bg-center bg-no-repeat focus-visible:outline-2 focus-visible:outline-[#235c4c]" style={{ backgroundImage: `url("${product.previewUrl}")` }} />
-        <div className="min-w-0 flex-1"><strong className="block text-sm">{product.code}</strong>{product.sourceFilename && <small className="mt-1 block break-all text-[10px] text-[#68726d]">{product.sourceFilename}</small>}<p className="mt-1 text-xs leading-relaxed text-[#68726d]">{product.description}</p></div>
+        <div className="min-w-0 flex-1"><strong className="block text-sm">{product.code}</strong>{product.sourceFilename && <small className="mt-1 block break-all text-[14px] text-[#68726d]">{product.sourceFilename}</small>}<p className="mt-1 text-xs leading-relaxed text-[#68726d]">{product.description}</p></div>
       </div>
       <div className={`grid gap-3 ${showPrices ? "grid-cols-2" : "grid-cols-1"}`}>
         <label className={ui.field}><span>Cantidad</span><input disabled={disabled} type="number" inputMode="numeric" min={1} max={200} step={1} required value={product.quantity || ""} onChange={(event) => onChange({ quantity: Number(event.target.value) })} /></label>

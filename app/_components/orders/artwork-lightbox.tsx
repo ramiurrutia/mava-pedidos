@@ -100,7 +100,7 @@ export function ArtworkLightbox({
           <>
             <div className="pointer-events-none absolute inset-x-0 top-0 z-10 min-h-16 border-b border-white/10 bg-[#111715]/90 px-4 pb-3 pr-16 pt-[calc(.75rem+env(safe-area-inset-top))] text-white backdrop-blur-md">
               <strong className="block max-w-[70vw] truncate text-sm font-semibold">{entry.image.title || (entry.editable ? `Imagen ${currentIndex + 1}` : entry.image.name)}</strong>
-              <span className="mt-1 block text-[10px] text-white/55">{orderCode} · {currentIndex + 1} de {entries.length}</span>
+              <span className="mt-1 block text-[14px] text-white/55">{orderCode} · {currentIndex + 1} de {entries.length}</span>
             </div>
 
             <div
@@ -110,14 +110,14 @@ export function ArtworkLightbox({
             >
               <div className="mx-auto max-w-2xl">
                 <div className="mb-3">
-                  <span className="mb-2 block text-[9px] font-bold uppercase tracking-[.12em] text-white/45">Preparación</span>
+                  <span className="mb-2 block text-[14px] font-bold uppercase tracking-[.12em] text-white/45">Preparación</span>
                   <div className="grid grid-cols-2 gap-2">
                     {preparationStatuses.map((status) => {
                       const active = entry.image.preparationStatus === status;
                       return (
                         <button
                           aria-pressed={active}
-                          className={`${active ? "border-white/55 bg-white text-[#1e2a25]" : "border-white/15 bg-white/5 text-white/65 hover:bg-white/10"} min-h-9 rounded-lg border px-2 text-[9px] font-semibold transition-colors disabled:cursor-wait disabled:opacity-50`}
+                          className={`${active ? "border-white/55 bg-white text-[#1e2a25]" : "border-white/15 bg-white/5 text-white/65 hover:bg-white/10"} min-h-9 rounded-lg border px-2 text-[14px] font-semibold transition-colors disabled:cursor-wait disabled:opacity-50`}
                           disabled={savingPreparation}
                           key={status}
                           onClick={() => void changePreparation(status)}
@@ -134,7 +134,7 @@ export function ArtworkLightbox({
                 <div className="border-t border-white/10 pt-3">
                   {editingDescription ? (
                     <form className="grid gap-3" onSubmit={saveDescription}>
-                      <label className="text-[9px] font-bold uppercase tracking-[.12em] text-white/45" htmlFor="lightbox-image-title">Título de la imagen</label>
+                      <label className="text-[14px] font-bold uppercase tracking-[.12em] text-white/45" htmlFor="lightbox-image-title">Título de la imagen</label>
                       <input
                         autoFocus
                         className="min-h-11 w-full rounded-lg border border-white/15 bg-white/10 p-3 text-sm text-white outline-none placeholder:text-white/35 focus:border-white/40"
@@ -146,8 +146,8 @@ export function ArtworkLightbox({
                         value={titleDraft}
                       />
                       <div className="flex items-center justify-between gap-3">
-                        <label className="text-[9px] font-bold uppercase tracking-[.12em] text-white/45" htmlFor="lightbox-image-description">Descripción</label>
-                        <small className="text-[9px] text-white/45">{descriptionDraft.length}/1000</small>
+                        <label className="text-[14px] font-bold uppercase tracking-[.12em] text-white/45" htmlFor="lightbox-image-description">Descripción</label>
+                        <small className="text-[14px] text-white/45">{descriptionDraft.length}/1000</small>
                       </div>
                       <textarea
                         disabled={savingDescription}
@@ -179,9 +179,9 @@ export function ArtworkLightbox({
                   ) : (
                     <div>
                       <div className="flex items-center justify-between gap-3">
-                        <span className="text-[9px] font-bold uppercase tracking-[.12em] text-white/45">{entry.editable ? "Título y descripción" : "Detalles del cuadro"}</span>
+                        <span className="text-[14px] font-bold uppercase tracking-[.12em] text-white/45">{entry.editable ? "Título y descripción" : "Detalles del cuadro"}</span>
                         {entry.editable && (
-                          <button className="inline-flex min-h-9 items-center gap-2 rounded-lg bg-white/10 px-3 text-[10px] font-semibold text-white transition hover:bg-white/20" disabled={savingDescription} onClick={() => { setTitleDraft(entry.image.title ?? ""); setDescriptionDraft(entry.image.description); setEditingDescription(true); }} type="button">
+                          <button className="inline-flex min-h-9 items-center gap-2 rounded-lg bg-white/10 px-3 text-[14px] font-semibold text-white transition hover:bg-white/20" disabled={savingDescription} onClick={() => { setTitleDraft(entry.image.title ?? ""); setDescriptionDraft(entry.image.description); setEditingDescription(true); }} type="button">
                             <EditIcon /> Editar
                           </button>
                         )}
